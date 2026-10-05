@@ -74,10 +74,31 @@ function extractTokens(html) {
     }
   }
 
+  let sign = findBetween(html, 'sign=', '&');
+  if (!sign) {
+    const signMatch = html.match(/"sign":"([^"]+)"/) || html.match(/sign=([^&"'\s]+)/);
+    if (signMatch) sign = signMatch[1];
+  }
+  if (sign && sign.includes('%')) {
+    try {
+      sign = decodeURIComponent(sign);
+    } catch {
+      // ignore
+    }
+  }
+
+  let timestamp = findBetween(html, 'timestamp=', '&') || findBetween(html, 'time=', '&');
+  if (!timestamp) {
+    const timeMatch = html.match(/"timestamp":(\d+)/) || html.match(/time=(\d+)/);
+    if (timeMatch) timestamp = timeMatch[1];
+  }
+
   return {
     jsToken: findBetween(html, 'fn%28%22', '%22%29'),
     dpLogid,
     bdstoken: findBetween(html, 'bdstoken":"', '"'),
+    sign,
+    timestamp,
   };
 }
 
@@ -229,18 +250,28 @@ function extractSurl(rawUrl, finalUrl = '') {
 /**
  * Attempt to retrieve direct download link for a file from share/download
  */
-async function fetchDirectDownloadLink(shareId, uk, fsId, cookie) {
+async function fetchDirectDownloadLink(shareId, uk, fsId, cookie, tokens = {}) {
   if (!shareId || !uk || !fsId) return null;
 
   try {
+    const postData = {
+      app_id: '250528',
+      web: '1',
+      channel: 'dubox',
+      clienttype: '0',
+      jsToken: tokens.jsToken || '',
+      'dp-logid': tokens.dpLogid || '',
+      shareid: String(shareId),
+      uk: String(uk),
+      fid_list: JSON.stringify([String(fsId)]),
+      primaryid: String(shareId),
+    };
+    if (tokens.sign) postData.sign = tokens.sign;
+    if (tokens.timestamp) postData.timestamp = tokens.timestamp;
+
     const res = await axios.post(
       'https://www.terabox.app/share/download',
-      new URLSearchParams({
-        app_id: '250528',
-        shareid: String(shareId),
-        uk: String(uk),
-        fid_list: JSON.stringify([String(fsId)]),
-      }),
+      new URLSearchParams(postData),
       {
         headers: {
           'User-Agent': USER_AGENT,
@@ -263,23 +294,123 @@ async function fetchDirectDownloadLink(shareId, uk, fsId, cookie) {
 }
 
 /**
- * Resolve TeraBox share link with Auto, Custom, or Hybrid methods.
+ * Resolve TeraBox share link via RapidAPI (terabox-downloader-api5)
+ */
+export async function resolveViaRapidApi(
+  rawUrl,
+  apiKey = process.env.RAPIDAPI_KEY,
+  backendBaseUrl = 'http://localhost:4000'
+) {
+  const activeKey = (apiKey || process.env.RAPIDAPI_KEY || '').trim();
+  if (!activeKey) {
+    throw new Error('RapidAPI Key is not configured. Please set RAPIDAPI_KEY in .env or dashboard.');
+  }
+
+  const host = process.env.RAPIDAPI_HOST || 'terabox-downloader-api5.p.rapidapi.com';
+  const postData = new URLSearchParams();
+  postData.append('url', rawUrl);
+
+  const res = await axios.post(`https://${host}/tbx.php`, postData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'x-rapidapi-key': activeKey,
+      'x-rapidapi-host': host,
+    },
+    timeout: 30000,
+  });
+
+  const data = res.data;
+  if (!data || (data.status !== 'success' && data.errno !== 0)) {
+    throw new Error(data?.message || data?.errmsg || 'RapidAPI TeraBox service returned error.');
+  }
+
+  const list = data.list || [];
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error('No files found in this TeraBox link via RapidAPI.');
+  }
+
+  const items = list.map((file, index) => {
+    const filename = file.server_filename || file.name || `terabox_file_${index + 1}`;
+    const sizeBytes = parseInt(file.size, 10) || null;
+    const kind = getMediaKind(filename);
+    const dlink = file.direct_link || file.fast_download_link || file.download_link || file.stream_url || '';
+    const thumbnail =
+      file.thumbnail || file.thumbs?.url3 || file.thumbs?.url2 || file.thumbs?.url1 || '';
+
+    const finalDownloadUrl = dlink
+      ? `${backendBaseUrl}/api/download?dlink=${encodeURIComponent(dlink)}&filename=${encodeURIComponent(filename)}`
+      : null;
+
+    return {
+      id: `tb_rapid_${file.fs_id || index}`,
+      groupId: String(file.fs_id || index),
+      kind,
+      url: finalDownloadUrl,
+      originalDlink: dlink || null,
+      fastStreamUrl: file.fast_stream_url || file.m3u8_url || null,
+      hasDirectDownload: Boolean(dlink),
+      requiresAuth: false,
+      filename,
+      mimeType:
+        kind === 'video' ? 'video/mp4' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream',
+      sizeBytes,
+      thumbnail,
+      durationSeconds: file.duration || undefined,
+      recommended: index === 0,
+      methodUsed: 'rapidapi',
+      headers: {
+        Referer: 'https://teraboxdl.site/',
+      },
+    };
+  });
+
+  return {
+    platform: 'terabox',
+    sourceUrl: rawUrl,
+    modeUsed: 'rapidapi',
+    shareTitle: data.title || (items[0] ? items[0].filename : 'TeraBox File'),
+    items,
+  };
+}
+
+/**
+ * Resolve TeraBox share link with Auto, Custom, RapidAPI, or Hybrid methods.
  *
  * @param {string} rawUrl - Target TeraBox URL
- * @param {string|object} optionsOrCookie - Cookie string OR options object { cookie, mode, backendBaseUrl }
+ * @param {string|object} optionsOrCookie - Cookie string OR options object { cookie, mode, backendBaseUrl, rapidApiKey }
  * @param {string} legacyBaseUrl - Base URL for proxy stream links
  */
 export async function resolveTeraBox(rawUrl, optionsOrCookie = '', legacyBaseUrl = 'http://localhost:4000') {
   let cookie = '';
-  let mode = 'hybrid'; // 'hybrid' | 'auto' | 'custom'
+  let mode = 'hybrid'; // 'hybrid' | 'auto' | 'custom' | 'rapidapi'
   let backendBaseUrl = legacyBaseUrl;
+  let rapidApiKey = process.env.RAPIDAPI_KEY || '';
 
   if (typeof optionsOrCookie === 'object' && optionsOrCookie !== null) {
     cookie = optionsOrCookie.cookie || '';
     mode = optionsOrCookie.mode || 'hybrid';
     backendBaseUrl = optionsOrCookie.backendBaseUrl || legacyBaseUrl;
+    rapidApiKey = optionsOrCookie.rapidApiKey || rapidApiKey;
   } else if (typeof optionsOrCookie === 'string') {
     cookie = optionsOrCookie;
+  }
+
+  let rapidErrMessage = null;
+
+  // 1. If mode is explicitly 'rapidapi', execute RapidAPI directly
+  if (mode === 'rapidapi') {
+    return await resolveViaRapidApi(rawUrl, rapidApiKey, backendBaseUrl);
+  }
+
+  // 2. If mode is 'hybrid' and RapidAPI key is available, try RapidAPI first
+  if (mode === 'hybrid' && rapidApiKey) {
+    try {
+      const rapidResult = await resolveViaRapidApi(rawUrl, rapidApiKey, backendBaseUrl);
+      return rapidResult;
+    } catch (rapidErr) {
+      rapidErrMessage = rapidErr.response?.data?.message || rapidErr.message;
+      console.warn(`[TeraBox Resolver] RapidAPI notice: ${rapidErrMessage}. Falling back to native resolver...`);
+    }
   }
 
   const formattedCookie = formatCookie(cookie);
@@ -382,8 +513,9 @@ export async function resolveTeraBox(rawUrl, optionsOrCookie = '', legacyBaseUrl
   }
 
   if (resData.errno === 460020 || resData.code === 460020 || resData.errmsg === 'need verify') {
+    const rapidNote = rapidErrMessage ? ` [RapidAPI: ${rapidErrMessage}]` : '';
     throw new Error(
-      'TeraBox requires verification or an authenticated session. Please set an updated TERABOX_COOKIE (ndus token) in the backend dashboard or switch to Auto mode.',
+      `TeraBox requires verification or an authenticated session.${rapidNote} Please update your TERABOX_COOKIE (ndus token) or RapidAPI key in the dashboard.`
     );
   }
 
@@ -409,19 +541,21 @@ export async function resolveTeraBox(rawUrl, optionsOrCookie = '', legacyBaseUrl
       const thumbnail =
         file.thumbs?.url3 || file.thumbs?.url2 || file.thumbs?.url1 || file.thumbs?.icon || '';
 
-      // If dlink is missing, try fetching it via share/download
+      // If dlink is missing, try fetching it via share/download with full token context
       if (!dlink && (formattedCookie || mode === 'auto')) {
-        const fetchedDlink = await fetchDirectDownloadLink(shareId, uk, file.fs_id, formattedCookie);
+        const fetchedDlink = await fetchDirectDownloadLink(shareId, uk, file.fs_id, formattedCookie, tokens);
         if (fetchedDlink) {
           dlink = fetchedDlink;
         }
       }
 
-      // If dlink is available, route it through backend proxy
-      // If not, point to thumbnail or direct share URL with clear fallback
+      // If dlink is available, route it through backend streaming proxy
+      // CRITICAL: Never fall back kind: 'video' or 'document' to thumbnail images!
       const finalDownloadUrl = dlink
         ? `${backendBaseUrl}/api/download?dlink=${encodeURIComponent(dlink)}&filename=${encodeURIComponent(filename)}`
-        : thumbnail || rawUrl;
+        : kind === 'image' && thumbnail
+        ? thumbnail
+        : null;
 
       return {
         id: `tb_${surl}_${file.fs_id || index}`,
@@ -429,6 +563,8 @@ export async function resolveTeraBox(rawUrl, optionsOrCookie = '', legacyBaseUrl
         kind,
         url: finalDownloadUrl,
         originalDlink: dlink || null,
+        hasDirectDownload: Boolean(dlink),
+        requiresAuth: !dlink,
         filename,
         mimeType:
           kind === 'video' ? 'video/mp4' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream',

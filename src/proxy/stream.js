@@ -21,11 +21,12 @@ export async function handleStreamDownload(req, res, cookie = '') {
     formattedCookie = `lang=en; ndus=${formattedCookie}`;
   }
 
-  // Build headers for upstream TeraBox request
+  // Build headers for upstream TeraBox or RapidAPI worker request
+  const isWorkerHost = dlink.includes('teraboxdl.site');
   const upstreamHeaders = {
     'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-    'Referer': 'https://www.terabox.com/',
+    'Referer': isWorkerHost ? 'https://teraboxdl.site/' : 'https://www.terabox.com/',
     'Accept': '*/*',
     'Connection': 'keep-alive',
   };

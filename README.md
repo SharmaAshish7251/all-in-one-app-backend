@@ -6,11 +6,29 @@ A lightweight, dedicated Node.js backend resolver and streaming proxy for **Tera
 
 ## Features
 
+- **Web Control Dashboard (`/` & `/dashboard`):** Modern interactive web interface for managing TeraBox credentials, toggling resolution modes, testing cookies, and previewing downloads.
+- **Dual Resolution Engine (Auto + Custom + Hybrid):**
+  - **Hybrid Mode (Default):** Attempts custom session credentials first; seamlessly falls back to automated parameter bypass if expired.
+  - **Auto Mode:** Zero-configuration extraction without requiring manual cookies.
+  - **Custom Mode:** Enforces personal `ndus` token for high-speed direct downloads.
+- **Auto-Capture Login Flow:** Whenever the `ndus` cookie expires, the dashboard immediately alerts the admin and enables a 1-click Auto-Sync bookmarklet that extracts the key directly from the browser login session into the backend with zero manual copying.
+- **Cookie Validator:** Real-time cookie testing and live latency checks.
 - **TeraBox Resolver:** Supports all TeraBox domains (`terabox.com`, `1024terabox.com`, `terabox.app`, `freeterabox.com`, `4funbox.com`, etc.).
 - **Streaming Proxy (`/api/download`):** Forwards file downloads while injecting required session cookies and headers (`Referer`, `Cookie`, `User-Agent`), so clients (React Native app, browsers, download managers) can download files directly without getting 403 Forbidden.
 - **Range Header Support:** Enables resumable downloads and video streaming/seeking.
 - **Twitter / X Resolver:** Built-in resolution for Twitter videos and photos.
 - **Client Agnostic:** Can be consumed directly by the React Native mobile app (`worker.ts`), browser, or cURL.
+
+---
+
+## Auto-Capturing the TeraBox `ndus` Key
+
+Instead of manually inspecting cookies in DevTools:
+1. Open the Dashboard at `http://localhost:4000/dashboard`.
+2. Click **⚡ Auto-Capture** or the **Login & Auto-Capture Key** alert banner.
+3. Drag the **⚡ Sync TeraBox to AIO** bookmarklet to your browser toolbar.
+4. Log into your TeraBox account in a new tab.
+5. Click the **⚡ Sync TeraBox to AIO** bookmarklet: it automatically extracts the `ndus` key and updates the backend instantly!
 
 ---
 

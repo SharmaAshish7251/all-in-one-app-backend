@@ -19,15 +19,20 @@ const metricUptime = document.getElementById('metric-uptime');
 const btnRefreshHealth = document.getElementById('btn-refresh-health');
 const refreshIcon = document.getElementById('refresh-icon');
 
-// Mode & Cookie
+// Mode & Cookie & RapidAPI
 const activeModeBadge = document.getElementById('active-mode-badge');
 const radioHybrid = document.getElementById('radio-mode-hybrid');
+const radioRapidApi = document.getElementById('radio-mode-rapidapi');
 const radioAuto = document.getElementById('radio-mode-auto');
 const radioCustom = document.getElementById('radio-mode-custom');
 const customCookieInput = document.getElementById('custom-cookie-input');
 const btnToggleVisibility = document.getElementById('btn-toggle-cookie-visibility');
 const toggleEyeIcon = document.getElementById('toggle-eye-icon');
 const cookieStatusIndicator = document.getElementById('cookie-status-indicator');
+const rapidApiKeyInput = document.getElementById('rapidapi-key-input');
+const btnToggleRapidVisibility = document.getElementById('btn-toggle-rapid-visibility');
+const toggleRapidEyeIcon = document.getElementById('toggle-rapid-eye-icon');
+const rapidApiStatusIndicator = document.getElementById('rapidapi-status-indicator');
 const btnTestCookie = document.getElementById('btn-test-cookie');
 const btnTestCookieText = document.getElementById('btn-test-cookie-text');
 const btnSaveConfig = document.getElementById('btn-save-config');
@@ -69,6 +74,7 @@ const btnResolveText = document.getElementById('btn-resolve-text');
 const btnResolveIcon = document.getElementById('btn-resolve-icon');
 const sampleTbBtn = document.getElementById('sample-tb-btn');
 const sampleTwBtn = document.getElementById('sample-tw-btn');
+const sampleYtBtn = document.getElementById('sample-yt-btn');
 
 const resolveResultBox = document.getElementById('resolve-result-box');
 const resolveSkeleton = document.getElementById('resolve-skeleton');
@@ -93,6 +99,8 @@ const btnToggleJson = document.getElementById('btn-toggle-json');
 const rawJsonContainer = document.getElementById('raw-json-container');
 const rawJsonCode = document.getElementById('raw-json-code');
 const btnCopyJson = document.getElementById('btn-copy-json');
+const mediaQualitiesContainer = document.getElementById('media-qualities-container');
+const mediaQualitiesList = document.getElementById('media-qualities-list');
 
 // Snippet Host placeholders
 const curlHost1 = document.getElementById('curl-host-1');
@@ -204,6 +212,18 @@ async function fetchConfig() {
     // Update active mode radio & badge
     applyModeUI(data.mode || 'hybrid');
 
+    // Update RapidAPI status indicator
+    if (data.hasRapidApi) {
+      rapidApiStatusIndicator.className = 'cookie-status-text active';
+      rapidApiStatusIndicator.innerHTML = `<i class="fa-solid fa-circle-check"></i> Configured (${data.maskedRapidApiKey || 'Key'})`;
+      if (!rapidApiKeyInput.value) {
+        rapidApiKeyInput.placeholder = `Current key: ${data.maskedRapidApiKey || 'Configured'}`;
+      }
+    } else {
+      rapidApiStatusIndicator.className = 'cookie-status-text warning';
+      rapidApiStatusIndicator.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> No RapidAPI key`;
+    }
+
     // Update cookie status indicator
     if (data.hasCookie) {
       cookieStatusIndicator.className = 'cookie-status-text active';
@@ -263,7 +283,10 @@ function renderLogs(logs = []) {
 function applyModeUI(mode) {
   activeModeBadge.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
 
-  if (mode === 'auto') {
+  if (mode === 'rapidapi') {
+    radioRapidApi.checked = true;
+    activeModeBadge.style.color = '#10b981';
+  } else if (mode === 'auto') {
     radioAuto.checked = true;
     activeModeBadge.style.color = '#38bdf8';
   } else if (mode === 'custom') {
@@ -296,6 +319,19 @@ btnToggleVisibility.addEventListener('click', () => {
     toggleEyeIcon.classList.replace('fa-eye-slash', 'fa-eye');
   }
 });
+
+// Toggle RapidAPI key visibility
+if (btnToggleRapidVisibility) {
+  btnToggleRapidVisibility.addEventListener('click', () => {
+    if (rapidApiKeyInput.type === 'password') {
+      rapidApiKeyInput.type = 'text';
+      toggleRapidEyeIcon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+      rapidApiKeyInput.type = 'password';
+      toggleRapidEyeIcon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+  });
+}
 
 // Guide accordion
 btnGuideToggle.addEventListener('click', () => {
@@ -354,6 +390,7 @@ btnTestCookie.addEventListener('click', async () => {
 btnSaveConfig.addEventListener('click', async () => {
   const selectedMode = document.querySelector('input[name="tb-mode"]:checked')?.value || 'hybrid';
   const cookieValue = customCookieInput.value.trim();
+  const rapidApiKeyValue = rapidApiKeyInput.value.trim();
 
   btnSaveConfig.disabled = true;
   btnSaveConfigText.textContent = 'Saving...';
@@ -365,6 +402,7 @@ btnSaveConfig.addEventListener('click', async () => {
       body: JSON.stringify({
         mode: selectedMode,
         cookie: cookieValue || undefined,
+        rapidApiKey: rapidApiKeyValue || undefined,
       }),
     });
     const data = await res.json();
@@ -374,6 +412,9 @@ btnSaveConfig.addEventListener('click', async () => {
       await fetchConfig();
       if (cookieValue) {
         customCookieInput.value = '';
+      }
+      if (rapidApiKeyValue) {
+        rapidApiKeyInput.value = '';
       }
     } else {
       showToast(data.error?.message || 'Failed to save configuration', 'error');
@@ -409,6 +450,12 @@ sampleTbBtn.addEventListener('click', () => {
 sampleTwBtn.addEventListener('click', () => {
   resolveInputUrl.value = 'https://x.com/jack/status/20';
 });
+
+if (sampleYtBtn) {
+  sampleYtBtn.addEventListener('click', () => {
+    resolveInputUrl.value = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+  });
+}
 
 resolveForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -507,25 +554,78 @@ function renderSuccessResult(data) {
     mediaDurationTag.classList.add('hidden');
   }
 
-  // Buttons
-  const downloadUrl = firstItem.url || data.sourceUrl || '#';
-  btnDownloadFile.href = downloadUrl;
-  btnDownloadFile.setAttribute('download', firstItem.filename || 'download');
+  // Buttons & Direct Stream Link state
+  function selectMediaItem(item) {
+    const hasBinary = Boolean(item.url && (item.originalDlink || item.url.includes('/api/download') || item.url.includes('/api/youtube/download')));
+    const dlUrl = hasBinary ? item.url : data.sourceUrl || '#';
 
-  btnDownloadFile.onclick = (e) => {
-    if (!firstItem.originalDlink && !firstItem.url.includes('/api/download')) {
-      e.preventDefault();
-      showToast('Opening original link for direct download...', 'info');
-      window.open(data.sourceUrl, '_blank');
-      return;
+    mediaFilename.textContent = item.filename || data.title || data.shareTitle || 'Media File';
+    mediaFilename.title = mediaFilename.textContent;
+    mediaSizeTag.innerHTML = `<i class="fa-solid fa-hard-drive"></i> ${formatBytes(item.sizeBytes)}`;
+    mediaTypeTag.innerHTML = `<i class="fa-solid fa-file"></i> ${item.mimeType || 'binary'}`;
+
+    btnDownloadFile.href = dlUrl;
+    if (hasBinary) {
+      btnDownloadFile.className = 'btn-action-primary emerald';
+      btnDownloadFile.innerHTML = `<i class="fa-solid fa-download"></i> Download ${item.quality || 'File'}`;
+      btnDownloadFile.setAttribute('download', item.filename || 'download');
+      btnDownloadFile.onclick = () => {
+        showToast('Download started for ' + (item.filename || 'media'), 'success');
+      };
+    } else {
+      btnDownloadFile.className = 'btn-action-primary warning';
+      btnDownloadFile.innerHTML = '<i class="fa-solid fa-key"></i> Login Required to Download';
+      btnDownloadFile.removeAttribute('download');
+      btnDownloadFile.onclick = (e) => {
+        e.preventDefault();
+        showToast('Active session needed: TeraBox requires a login session for direct video downloads. Opening Auto-Capture...', 'warning');
+        openCaptureModal();
+      };
     }
-    showToast('Download started for ' + (firstItem.filename || 'media'), 'success');
-  };
 
-  btnStreamPreview.href = downloadUrl;
-  btnCopyStreamUrl.onclick = () => {
-    copyToClipboard(downloadUrl, 'Download stream link copied!');
-  };
+    btnStreamPreview.href = dlUrl;
+    btnStreamPreview.onclick = (e) => {
+      if (!hasBinary) {
+        e.preventDefault();
+        window.open(data.sourceUrl, '_blank');
+        showToast('Opening web page player...', 'info');
+      }
+    };
+
+    btnCopyStreamUrl.onclick = () => {
+      copyToClipboard(dlUrl, hasBinary ? 'Download stream link copied!' : 'Share link copied!');
+    };
+  }
+
+  // Initial selection
+  selectMediaItem(firstItem);
+
+  // Render format / quality chips if multiple options exist
+  if (items.length > 1 && mediaQualitiesContainer && mediaQualitiesList) {
+    mediaQualitiesContainer.classList.remove('hidden');
+    mediaQualitiesList.innerHTML = '';
+
+    items.forEach((item, idx) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `btn-chip ${idx === 0 ? 'active' : ''}`;
+      chip.style.fontSize = '12px';
+      chip.style.padding = '6px 12px';
+      const icon = item.kind === 'audio' ? 'fa-music' : 'fa-video';
+      const sizeStr = item.sizeBytes ? ` (${formatBytes(item.sizeBytes)})` : '';
+      chip.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${item.quality || `Option ${idx + 1}`}${sizeStr}</span>`;
+
+      chip.onclick = () => {
+        Array.from(mediaQualitiesList.children).forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        selectMediaItem(item);
+      };
+
+      mediaQualitiesList.appendChild(chip);
+    });
+  } else if (mediaQualitiesContainer) {
+    mediaQualitiesContainer.classList.add('hidden');
+  }
 
   // JSON Preview
   rawJsonCode.textContent = JSON.stringify(data, null, 2);

@@ -6,7 +6,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isTeraBoxUrl, resolveTeraBox, testTeraBoxCookie, formatCookie } from './resolvers/terabox.js';
 import { isTwitterUrl, resolveTwitter } from './resolvers/twitter.js';
+import { isYouTubeUrl, resolveYouTube } from './resolvers/youtube.js';
 import { handleStreamDownload } from './proxy/stream.js';
+import { handleYouTubeDownload } from './proxy/youtube.js';
 
 dotenv.config();
 
@@ -22,7 +24,9 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 // In-memory dynamic configuration (can be updated from dashboard without restarting)
 let runtimeConfig = {
   teraboxCookie: process.env.TERABOX_COOKIE || '',
-  teraboxMode: process.env.TERABOX_MODE || 'hybrid', // 'hybrid' | 'auto' | 'custom'
+  teraboxMode: process.env.TERABOX_MODE || 'hybrid', // 'hybrid' | 'auto' | 'custom' | 'rapidapi'
+  rapidApiKey: process.env.RAPIDAPI_KEY || '',
+  rapidApiHost: process.env.RAPIDAPI_HOST || 'terabox-downloader-api5.p.rapidapi.com',
 };
 
 // In-memory circular buffer for recent request logs (up to 30 items)
@@ -42,7 +46,7 @@ function addLogEntry(entry) {
 /**
  * Persist config changes to .env file
  */
-function persistConfigToEnv(cookie, mode) {
+function persistConfigToEnv(cookie, mode, rapidApiKey) {
   try {
     let content = '';
     if (fs.existsSync(envPath)) {
@@ -62,6 +66,14 @@ function persistConfigToEnv(cookie, mode) {
         content = content.replace(/TERABOX_MODE=.*/g, `TERABOX_MODE=${mode}`);
       } else {
         content += `\nTERABOX_MODE=${mode}`;
+      }
+    }
+
+    if (rapidApiKey !== undefined) {
+      if (content.includes('RAPIDAPI_KEY=')) {
+        content = content.replace(/RAPIDAPI_KEY=.*/g, `RAPIDAPI_KEY=${rapidApiKey}`);
+      } else {
+        content += `\nRAPIDAPI_KEY=${rapidApiKey}`;
       }
     }
 
@@ -98,13 +110,14 @@ app.get('/', (req, res) => {
     name: 'All-in-One Downloader Backend',
     status: 'running',
     dashboardUrl: `${BASE_URL}/dashboard`,
-    supportedPlatforms: ['terabox', 'twitter/x'],
+    supportedPlatforms: ['terabox', 'twitter/x', 'youtube'],
     endpoints: {
       dashboard: 'GET /dashboard',
       health: 'GET /health',
       resolvePost: 'POST /resolve { url: "..." }',
       resolveGet: 'GET /api/resolve?url=...',
       streamDownload: 'GET /api/download?dlink=...&filename=...',
+      youtubeDownload: 'GET /api/youtube/download?id=...&format=...&filename=...',
       configGet: 'GET /api/config',
       configPost: 'POST /api/config',
       testCookie: 'POST /api/test-cookie',
@@ -126,6 +139,7 @@ app.get('/health', (req, res) => {
     status: 'healthy',
     uptime: process.uptime(),
     teraboxConfigured: Boolean(runtimeConfig.teraboxCookie),
+    rapidApiConfigured: Boolean(runtimeConfig.rapidApiKey),
     teraboxMode: runtimeConfig.teraboxMode,
     timestamp: new Date().toISOString(),
   });
@@ -139,17 +153,25 @@ app.get('/api/config', (req, res) => {
     maskedCookie = cookie.length > 12 ? `${cookie.slice(0, 4)}...${cookie.slice(-4)}` : '••••••••';
   }
 
+  const apiKey = runtimeConfig.rapidApiKey || '';
+  let maskedRapidApiKey = '';
+  if (apiKey) {
+    maskedRapidApiKey = apiKey.length > 12 ? `${apiKey.slice(0, 5)}...${apiKey.slice(-4)}` : '••••••••';
+  }
+
   res.json({
     mode: runtimeConfig.teraboxMode,
     hasCookie: Boolean(cookie),
     maskedCookie,
+    hasRapidApi: Boolean(apiKey),
+    maskedRapidApiKey,
   });
 });
 
 app.post('/api/config', (req, res) => {
-  const { cookie, mode } = req.body || {};
+  const { cookie, mode, rapidApiKey } = req.body || {};
 
-  if (mode && ['hybrid', 'auto', 'custom'].includes(mode)) {
+  if (mode && ['hybrid', 'auto', 'custom', 'rapidapi'].includes(mode)) {
     runtimeConfig.teraboxMode = mode;
   }
 
@@ -157,14 +179,19 @@ app.post('/api/config', (req, res) => {
     runtimeConfig.teraboxCookie = cookie.trim();
   }
 
+  if (typeof rapidApiKey === 'string') {
+    runtimeConfig.rapidApiKey = rapidApiKey.trim();
+  }
+
   // Persist to .env
-  persistConfigToEnv(runtimeConfig.teraboxCookie, runtimeConfig.teraboxMode);
+  persistConfigToEnv(runtimeConfig.teraboxCookie, runtimeConfig.teraboxMode, runtimeConfig.rapidApiKey);
 
   res.json({
     ok: true,
     message: 'Configuration updated successfully.',
     mode: runtimeConfig.teraboxMode,
     hasCookie: Boolean(runtimeConfig.teraboxCookie),
+    hasRapidApi: Boolean(runtimeConfig.rapidApiKey),
   });
 });
 
@@ -244,8 +271,9 @@ app.get('/api/logs', (req, res) => {
 /**
  * Common resolver logic used by both POST /resolve and GET /api/resolve
  */
-async function handleResolve(url, res, method = 'POST') {
+async function handleResolve(req, res, method = 'POST') {
   const start = Date.now();
+  const url = method === 'POST' ? req.body?.url : req.query?.url;
 
   if (!url || typeof url !== 'string') {
     addLogEntry({ method, url: '(none)', platform: 'unknown', status: 400, latencyMs: 0 });
@@ -255,6 +283,9 @@ async function handleResolve(url, res, method = 'POST') {
   }
 
   const cleanUrl = url.trim();
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.get('host') || `localhost:${PORT}`;
+  const effectiveBaseUrl = `${protocol}://${host}`;
 
   try {
     // 1. TeraBox check
@@ -262,7 +293,8 @@ async function handleResolve(url, res, method = 'POST') {
       const result = await resolveTeraBox(cleanUrl, {
         cookie: runtimeConfig.teraboxCookie,
         mode: runtimeConfig.teraboxMode,
-        backendBaseUrl: BASE_URL,
+        rapidApiKey: runtimeConfig.rapidApiKey,
+        backendBaseUrl: effectiveBaseUrl,
       });
 
       const latencyMs = Date.now() - start;
@@ -278,7 +310,17 @@ async function handleResolve(url, res, method = 'POST') {
       return res.json(result);
     }
 
-    // 3. Unsupported
+    // 3. YouTube check
+    if (isYouTubeUrl(cleanUrl)) {
+      const result = await resolveYouTube(cleanUrl, {
+        backendBaseUrl: effectiveBaseUrl,
+      });
+      const latencyMs = Date.now() - start;
+      addLogEntry({ method, url: cleanUrl, platform: 'youtube', status: 200, latencyMs });
+      return res.json(result);
+    }
+
+    // 4. Unsupported
     const latencyMs = Date.now() - start;
     addLogEntry({ method, url: cleanUrl, platform: 'unsupported', status: 422, latencyMs });
     return res.status(422).json({
@@ -302,19 +344,22 @@ async function handleResolve(url, res, method = 'POST') {
 
 // POST /resolve — matches mobile app contract
 app.post('/resolve', async (req, res) => {
-  const { url } = req.body || {};
-  await handleResolve(url, res, 'POST');
+  await handleResolve(req, res, 'POST');
 });
 
 // GET /api/resolve — convenient for testing via browser
 app.get('/api/resolve', async (req, res) => {
-  const { url } = req.query;
-  await handleResolve(url, res, 'GET');
+  await handleResolve(req, res, 'GET');
 });
 
 // GET /api/download — direct streaming proxy for TeraBox files
 app.get('/api/download', async (req, res) => {
   await handleStreamDownload(req, res, runtimeConfig.teraboxCookie);
+});
+
+// GET /api/youtube/download — streaming proxy for YouTube media
+app.get('/api/youtube/download', async (req, res) => {
+  await handleYouTubeDownload(req, res);
 });
 
 // 404 Handler

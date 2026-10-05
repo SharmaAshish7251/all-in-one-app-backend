@@ -96,6 +96,17 @@
                 </div>
               </label>
 
+              <label class="mode-option" id="mode-label-rapidapi">
+                <input type="radio" name="tb-mode" value="rapidapi" id="radio-mode-rapidapi" />
+                <div class="mode-option-content">
+                  <div class="mode-head">
+                    <i class="fa-solid fa-cloud-bolt mode-icon rapid-icon"></i>
+                    <span class="mode-name">RapidAPI Engine</span>
+                  </div>
+                  <p class="mode-desc">Uses terabox-downloader-api5 cloud service for direct high-speed file streams.</p>
+                </div>
+              </label>
+
               <label class="mode-option" id="mode-label-auto">
                 <input type="radio" name="tb-mode" value="auto" id="radio-mode-auto" />
                 <div class="mode-option-content">
@@ -117,6 +128,32 @@
                   <p class="mode-desc">Enforces your personal TeraBox session token (ndus) for high-speed direct links.</p>
                 </div>
               </label>
+            </div>
+          </div>
+
+          <!-- RapidAPI Key Input Section -->
+          <div class="cookie-input-section" id="rapidapi-input-section" style="margin-bottom: 16px;">
+            <div class="input-header-row">
+              <label for="rapidapi-key-input" class="section-label">
+                RapidAPI Key (<code>terabox-downloader-api5</code>)
+              </label>
+              <span class="cookie-status-text" id="rapidapi-status-indicator">
+                <i class="fa-solid fa-circle-question"></i> Not verified yet
+              </span>
+            </div>
+
+            <div class="input-wrapper">
+              <input
+                type="password"
+                id="rapidapi-key-input"
+                class="form-control code-font"
+                placeholder="Paste RapidAPI Key (e.g. b79e8f...)"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" id="btn-toggle-rapid-visibility" class="btn-input-addon" title="Toggle Visibility">
+                <i class="fa-solid fa-eye" id="toggle-rapid-eye-icon"></i>
+              </button>
             </div>
           </div>
 
@@ -247,7 +284,7 @@
                 type="url"
                 id="resolve-input-url"
                 class="form-control url-input"
-                placeholder="Paste TeraBox or Twitter/X share URL here..."
+                placeholder="Paste YouTube, TeraBox, or Twitter/X share URL here..."
                 required
               />
               <button type="submit" id="btn-resolve" class="btn btn-primary btn-resolve">
@@ -257,6 +294,9 @@
             </div>
             <div class="quick-examples">
               <span class="examples-label">Try sample:</span>
+              <button type="button" class="btn-chip" id="sample-yt-btn">
+                <i class="fa-brands fa-youtube" style="color: #ff0000;"></i> YouTube Sample
+              </button>
               <button type="button" class="btn-chip" id="sample-tb-btn">
                 <i class="fa-solid fa-box"></i> TeraBox Sample
               </button>
@@ -330,6 +370,12 @@
                       <i class="fa-solid fa-code"></i>
                       <span>JSON</span>
                     </button>
+                  </div>
+
+                  <!-- Quality / Multiple Streams Selector -->
+                  <div id="media-qualities-container" class="media-qualities-container hidden" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Download Options:</div>
+                    <div id="media-qualities-list" class="media-qualities-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                   </div>
                 </div>
               </div>

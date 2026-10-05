@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIO Backend Control Center & TeraBox Resolver</title>
+  <meta name="description" content="Admin dashboard for All-in-One Downloader backend with Auto & Custom TeraBox resolver management, health telemetry, and live testing sandbox." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <div class="dashboard-layout">
+    <!-- Top Navigation / Header -->
+    <header class="dashboard-header">
+      <div class="brand-group">
+        <div class="brand-icon">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+        </div>
+        <div class="brand-text">
+          <h1>AIO Backend Control Center</h1>
+          <span class="brand-subtitle">Resolver Engine & TeraBox Auto/Custom Manager</span>
+        </div>
+      </div>
+
+      <div class="header-status-group">
+        <div class="status-pill" id="server-status-pill">
+          <span class="status-dot pulsing" id="status-dot"></span>
+          <span class="status-label" id="status-label">Checking...</span>
+        </div>
+        <div class="metric-pill">
+          <i class="fa-solid fa-server"></i>
+          <span>Uptime: <strong id="metric-uptime">--</strong></span>
+        </div>
+        <button id="btn-refresh-health" class="btn-icon" title="Refresh Status">
+          <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Expiry Alert Banner (Shown when ndus cookie needs verification/expired) -->
+    <div id="expiry-warning-banner" class="alert-banner-box hidden" role="alert">
+      <div class="alert-banner-icon">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div class="alert-banner-body">
+        <h3>TeraBox Session Expired</h3>
+        <p>Your <code>ndus</code> session cookie is expired or requires CAPTCHA verification. Log in to your TeraBox account to auto-capture a fresh key and restore full high-speed downloads.</p>
+      </div>
+      <button type="button" id="btn-banner-login-capture" class="btn btn-warning-glow">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Login & Auto-Capture Key</span>
+      </button>
+    </div>
+
+    <!-- Main Grid Content -->
+    <main class="dashboard-main">
+      <!-- Left Column: TeraBox Management -->
+      <section class="dashboard-column" aria-label="TeraBox Configuration">
+        <!-- TeraBox Manager Card -->
+        <article class="glass-card terabox-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="badge-icon tb-badge">
+                <i class="fa-solid fa-box-archive"></i>
+              </div>
+              <div>
+                <h2>TeraBox Resolver Config</h2>
+                <p class="card-desc">Switch between Auto bypass, Custom cookie, or Hybrid resolution</p>
+              </div>
+            </div>
+            <span class="mode-badge" id="active-mode-badge">Hybrid</span>
+          </div>
+
+          <!-- Mode Selector Tabs -->
+          <div class="mode-selector-wrapper">
+            <label class="section-label">Select Resolver Strategy</label>
+            <div class="mode-options-grid" role="radiogroup" aria-label="Resolution Modes">
+              <label class="mode-option" id="mode-label-hybrid">
+                <input type="radio" name="tb-mode" value="hybrid" id="radio-mode-hybrid" checked />
+                <div class="mode-option-content">
+                  <div class="mode-head">
+                    <i class="fa-solid fa-bolt-lightning mode-icon hybrid-icon"></i>
+                    <span class="mode-name">Hybrid Mode</span>
+                    <span class="pill-rec">Recommended</span>
+                  </div>
+                  <p class="mode-desc">Uses Custom cookie if valid; automatically falls back to Auto bypass if expired.</p>
+                </div>
+              </label>
+
+              <label class="mode-option" id="mode-label-auto">
+                <input type="radio" name="tb-mode" value="auto" id="radio-mode-auto" />
+                <div class="mode-option-content">
+                  <div class="mode-head">
+                    <i class="fa-solid fa-robot mode-icon auto-icon"></i>
+                    <span class="mode-name">Auto Mode</span>
+                  </div>
+                  <p class="mode-desc">Zero configuration required. Uses streamlined direct parameters and public fallback extractors.</p>
+                </div>
+              </label>
+
+              <label class="mode-option" id="mode-label-custom">
+                <input type="radio" name="tb-mode" value="custom" id="radio-mode-custom" />
+                <div class="mode-option-content">
+                  <div class="mode-head">
+                    <i class="fa-solid fa-key mode-icon custom-icon"></i>
+                    <span class="mode-name">Custom Cookie</span>
+                  </div>
+                  <p class="mode-desc">Enforces your personal TeraBox session token (ndus) for high-speed direct links.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Custom Cookie Input Section -->
+          <div class="cookie-input-section" id="cookie-input-section">
+            <div class="input-header-row">
+              <label for="custom-cookie-input" class="section-label">
+                TeraBox Session Cookie (<code>ndus</code> Token)
+              </label>
+              <span class="cookie-status-text" id="cookie-status-indicator">
+                <i class="fa-solid fa-circle-question"></i> Not verified yet
+              </span>
+            </div>
+
+            <div class="input-wrapper">
+              <input
+                type="password"
+                id="custom-cookie-input"
+                class="form-control code-font"
+                placeholder="Paste your ndus token or full cookie (e.g. Yfg7eX...)"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" id="btn-toggle-cookie-visibility" class="btn-input-addon" title="Toggle Visibility">
+                <i class="fa-solid fa-eye" id="toggle-eye-icon"></i>
+              </button>
+            </div>
+
+            <!-- Action Buttons for Cookie -->
+            <div class="cookie-actions-row">
+              <button type="button" id="btn-open-auto-capture" class="btn btn-highlight" title="Log in to TeraBox and auto-capture token in 1 click">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Auto-Capture</span>
+              </button>
+              <button type="button" id="btn-test-cookie" class="btn btn-secondary">
+                <i class="fa-solid fa-flask-vial"></i>
+                <span id="btn-test-cookie-text">Test Cookie</span>
+              </button>
+              <button type="button" id="btn-save-config" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span id="btn-save-config-text">Save & Apply Config</span>
+              </button>
+            </div>
+
+            <!-- Test Result Banner -->
+            <div id="cookie-test-banner" class="test-banner hidden">
+              <div class="test-banner-content">
+                <i class="fa-solid fa-circle-info banner-icon" id="banner-icon"></i>
+                <span id="banner-message">Status will appear here</span>
+              </div>
+              <span class="test-banner-latency" id="banner-latency">0ms</span>
+            </div>
+          </div>
+
+          <!-- Accordion: How to get ndus cookie -->
+          <div class="guide-accordion">
+            <button type="button" class="guide-toggle" id="btn-guide-toggle" aria-expanded="false">
+              <span><i class="fa-regular fa-lightbulb"></i> How to get your TeraBox <code>ndus</code> token in 15 seconds</span>
+              <i class="fa-solid fa-chevron-down guide-arrow" id="guide-arrow"></i>
+            </button>
+            <div class="guide-content hidden" id="guide-content">
+              <ol class="step-list">
+                <li>Log in to <a href="https://www.terabox.com" target="_blank" rel="noopener noreferrer">terabox.com</a> in your Chrome/Firefox/Edge browser.</li>
+                <li>Press <kbd>F12</kbd> (or right click → <em>Inspect</em>) to open Developer Tools.</li>
+                <li>Go to the <strong>Application</strong> (Chrome/Edge) or <strong>Storage</strong> (Firefox) tab.</li>
+                <li>Under <strong>Cookies</strong> on the left, select <code>https://www.terabox.com</code>.</li>
+                <li>Find the cookie named <code>ndus</code>, double click its Value, copy it, and paste it into the box above!</li>
+              </ol>
+            </div>
+          </div>
+        </article>
+
+        <!-- Live Activity & Telemetry Card -->
+        <article class="glass-card telemetry-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="badge-icon log-badge">
+                <i class="fa-solid fa-wave-square"></i>
+              </div>
+              <div>
+                <h2>Real-Time Activity Feed</h2>
+                <p class="card-desc">Incoming resolve & download stream requests</p>
+              </div>
+            </div>
+            <button id="btn-clear-logs" class="btn-xs" title="Clear table">Clear</button>
+          </div>
+          <div class="table-container">
+            <table class="telemetry-table" id="telemetry-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Method</th>
+                  <th>Platform</th>
+                  <th>Status</th>
+                  <th>Latency</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-tbody">
+                <tr class="empty-row">
+                  <td colspan="5">No recent requests recorded. Test a link below!</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- Right Column: Interactive Sandbox & Tools -->
+      <section class="dashboard-column" aria-label="Interactive Resolver Sandbox">
+        <!-- Live Link Tester Card -->
+        <article class="glass-card sandbox-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="badge-icon test-badge">
+                <i class="fa-solid fa-play"></i>
+              </div>
+              <div>
+                <h2>Live Link Resolver Sandbox</h2>
+                <p class="card-desc">Test URL resolution and streaming proxy in real time</p>
+              </div>
+            </div>
+          </div>
+
+          <form id="resolve-form" class="resolve-form" onsubmit="return false;">
+            <div class="url-input-container">
+              <i class="fa-solid fa-link url-input-icon"></i>
+              <input
+                type="url"
+                id="resolve-input-url"
+                class="form-control url-input"
+                placeholder="Paste TeraBox or Twitter/X share URL here..."
+                required
+              />
+              <button type="submit" id="btn-resolve" class="btn btn-primary btn-resolve">
+                <i class="fa-solid fa-magnifying-glass" id="btn-resolve-icon"></i>
+                <span id="btn-resolve-text">Resolve Link</span>
+              </button>
+            </div>
+            <div class="quick-examples">
+              <span class="examples-label">Try sample:</span>
+              <button type="button" class="btn-chip" id="sample-tb-btn">
+                <i class="fa-solid fa-box"></i> TeraBox Sample
+              </button>
+              <button type="button" class="btn-chip" id="sample-tw-btn">
+                <i class="fa-brands fa-x-twitter"></i> Twitter/X Sample
+              </button>
+            </div>
+          </form>
+
+          <!-- Result Presentation Area -->
+          <div id="resolve-result-box" class="resolve-result-box hidden">
+            <!-- Loading Skeleton -->
+            <div id="resolve-skeleton" class="skeleton-wrapper hidden">
+              <div class="skeleton skeleton-thumb"></div>
+              <div class="skeleton-details">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-pill"></div>
+                <div class="skeleton skeleton-btn"></div>
+              </div>
+            </div>
+
+            <!-- Error Card -->
+            <div id="resolve-error-card" class="result-error-card hidden">
+              <div class="error-icon-box">
+                <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <div class="error-body">
+                <h3 id="error-title">Resolution Failed</h3>
+                <p id="error-desc">Error message will be shown here.</p>
+              </div>
+            </div>
+
+            <!-- Success Card -->
+            <div id="resolve-success-card" class="result-success-card hidden">
+              <div class="media-preview-header">
+                <span class="pill-platform" id="result-platform-badge">TeraBox</span>
+                <span class="pill-method" id="result-method-badge">Hybrid</span>
+                <span class="pill-count" id="result-items-count">1 file</span>
+              </div>
+
+              <div class="media-item-card">
+                <div class="media-thumb-container" id="media-thumb-container">
+                  <img id="media-thumb-img" src="" alt="Media Thumbnail" class="media-thumb" />
+                  <div class="media-kind-overlay" id="media-kind-badge">
+                    <i class="fa-solid fa-video"></i>
+                  </div>
+                </div>
+
+                <div class="media-info-container">
+                  <h3 id="media-filename" class="media-filename">Filename</h3>
+                  <div class="media-meta-row">
+                    <span class="meta-tag" id="media-size-tag"><i class="fa-solid fa-hard-drive"></i> 354 MB</span>
+                    <span class="meta-tag" id="media-type-tag"><i class="fa-solid fa-file-video"></i> video/mp4</span>
+                    <span class="meta-tag hidden" id="media-duration-tag"><i class="fa-regular fa-clock"></i> 41m</span>
+                  </div>
+
+                  <div class="media-actions-row">
+                    <a id="btn-download-file" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-download-file" download>
+                      <i class="fa-solid fa-cloud-arrow-down"></i>
+                      <span>Download File</span>
+                    </a>
+                    <a id="btn-stream-preview" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="Watch media stream directly">
+                      <i class="fa-solid fa-play"></i>
+                      <span>Watch Stream</span>
+                    </a>
+                    <button type="button" id="btn-copy-stream-url" class="btn btn-secondary btn-sm" title="Copy streaming proxy URL">
+                      <i class="fa-solid fa-copy"></i>
+                      <span>Copy Link</span>
+                    </button>
+                    <button type="button" id="btn-toggle-json" class="btn btn-ghost btn-sm" title="Inspect raw API JSON">
+                      <i class="fa-solid fa-code"></i>
+                      <span>JSON</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Collapsible Raw JSON -->
+              <div id="raw-json-container" class="raw-json-container hidden">
+                <div class="json-header">
+                  <span>Raw Resolve Response</span>
+                  <button type="button" id="btn-copy-json" class="btn-xs">Copy JSON</button>
+                </div>
+                <pre><code id="raw-json-code">{}</code></pre>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Developer Integration & API Quick Reference -->
+        <article class="glass-card api-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="badge-icon code-badge">
+                <i class="fa-solid fa-terminal"></i>
+              </div>
+              <div>
+                <h2>API Integration & Quick Reference</h2>
+                <p class="card-desc">Seamless integration with mobile apps and scripts</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-snippet-block">
+            <div class="snippet-header">
+              <span class="method-tag post">POST</span>
+              <span class="endpoint-path">/resolve</span>
+              <button class="btn-copy-snippet" id="btn-copy-post-curl" title="Copy cURL">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+            <pre class="snippet-code"><code>curl -X POST <span class="host-placeholder" id="curl-host-1">http://localhost:4000</span>/resolve \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://1024terabox.com/s/13jzq..."}'</code></pre>
+          </div>
+
+          <div class="api-snippet-block">
+            <div class="snippet-header">
+              <span class="method-tag get">GET</span>
+              <span class="endpoint-path">/api/download?dlink=...&filename=...</span>
+              <button class="btn-copy-snippet" id="btn-copy-get-curl" title="Copy URL">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+            <p class="snippet-caption">Streaming proxy endpoint that injects required authentication headers for fast playback on mobile.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer">
+      <p>All-in-One Downloader Backend &copy; 2026 &bull; Antigravity High Performance Engine</p>
+    </footer>
+  </div>
+
+  <!-- Auto-Capture Login Modal -->
+  <div id="modal-auto-capture" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-capture-title">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="badge-icon tb-badge">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h2 id="modal-capture-title">TeraBox Login & Auto-Capture</h2>
+            <p class="modal-subtitle">Log in to TeraBox and auto-capture your <code>ndus</code> session key</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-modal" class="btn-icon" aria-label="Close Modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" id="modal-body-steps">
+        <div class="capture-steps-container">
+          <!-- Step 1 -->
+          <div class="capture-step">
+            <div class="step-num">1</div>
+            <div class="step-details">
+              <h4>Drag this Sync Bookmarklet to your Bookmarks Toolbar</h4>
+              <p>Drag the button below directly into your browser's bookmarks bar (or right-click → bookmark link):</p>
+              <div class="bookmarklet-box">
+                <a id="sync-bookmarklet-link" href="#" class="bookmarklet-chip" draggable="true" title="Drag to Bookmarks Bar">
+                  <i class="fa-solid fa-bolt-lightning"></i> ⚡ Sync TeraBox to AIO
+                </a>
+                <span class="bookmarklet-tip"><i class="fa-solid fa-arrow-turn-up"></i> Drag & drop into your browser toolbar</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="capture-step">
+            <div class="step-num">2</div>
+            <div class="step-details">
+              <h4>Log into your TeraBox Account</h4>
+              <p>Open TeraBox in a new tab and sign in using Google, Email, or QR Code:</p>
+              <a href="https://www.terabox.com/main" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="btn-open-terabox-tab">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open TeraBox Login in New Tab
+              </a>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="capture-step">
+            <div class="step-num">3</div>
+            <div class="step-details">
+              <h4>Click the Bookmarklet in the TeraBox Tab</h4>
+              <p>Once logged into TeraBox, click the <strong>⚡ Sync TeraBox to AIO</strong> bookmark! It instantly extracts your active <code>ndus</code> key and syncs it back to this dashboard.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Listening Indicator -->
+        <div class="listening-bar" id="listening-bar">
+          <div class="listening-pulse"></div>
+          <span>Listening for incoming session capture from TeraBox...</span>
+        </div>
+      </div>
+
+      <!-- Success View inside Modal -->
+      <div class="modal-body modal-success-view hidden" id="modal-body-success">
+        <div class="success-icon-burst">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h3>Session Key Auto-Captured!</h3>
+        <p>Your fresh <code>ndus</code> token has been verified and applied to the backend. High-speed TeraBox downloads are restored!</p>
+        <div class="captured-token-box" id="captured-token-preview">ndus=••••••••••••</div>
+        <button type="button" id="btn-modal-done" class="btn btn-primary" style="margin-top: 18px; width: 100%;">Done & Return</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@ import { isYouTubeUrl, resolveYouTube, getYouTubeCookieFilePath, saveYouTubeCook
 import { handleStreamDownload } from './proxy/stream.js';
 import { handleYouTubeDownload } from './proxy/youtube.js';
 import { handleInstagramDownload } from './proxy/instagram.js';
-import { handlePinterestDownload } from './proxy/pinterest.js';
+import { handlePinterestDownload, handlePinterestPreview } from './proxy/pinterest.js';
 import { handlePinterestImageDownload } from './proxy/pinterest-image.js';
 
 dotenv.config();
@@ -149,6 +149,7 @@ app.get('/', (req, res) => {
       streamDownload: 'GET /api/download?dlink=...&filename=...',
       youtubeDownload: 'GET /api/youtube/download?id=...&format=...&filename=...',
       pinterestDownload: 'GET /api/pinterest/download?url=...&videoFormatId=...&audioFormatId=...',
+      pinterestPreview: 'GET /api/pinterest/preview?url=...&videoFormatId=...&audioFormatId=...',
       pinterestImageDownload: 'GET /api/pinterest/image?url=...&filename=...',
       configGet: 'GET /api/config',
       configPost: 'POST /api/config',
@@ -437,6 +438,11 @@ app.get('/api/instagram/download', async (req, res) => {
 // GET /api/pinterest/download — merge separate Pin video/audio streams
 app.get('/api/pinterest/download', async (req, res) => {
   await handlePinterestDownload(req, res);
+});
+
+// GET /api/pinterest/preview — prepare and serve merged Pin video inline for playback
+app.get('/api/pinterest/preview', async (req, res) => {
+  await handlePinterestPreview(req, res);
 });
 
 // GET /api/pinterest/image — download an image from Pinterest's CDN

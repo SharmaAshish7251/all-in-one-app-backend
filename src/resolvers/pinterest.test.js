@@ -177,12 +177,81 @@ test('includes an audio download option when yt-dlp exposes a separate audio str
   assert.equal(mergedVideoUrl.searchParams.get('videoFormatId'), 'video');
   assert.equal(mergedVideoUrl.searchParams.get('audioFormatId'), 'audio');
   assert.equal(mergedVideoUrl.searchParams.get('filename'), 'A_Pin_Video_1_720p.mp4');
+  const previewUrl = new URL(response.items[0].previewUrl);
+  assert.equal(previewUrl.pathname, '/api/pinterest/preview');
+  assert.equal(previewUrl.searchParams.get('videoFormatId'), 'video');
+  assert.equal(previewUrl.searchParams.get('audioFormatId'), 'audio');
   assert.equal(response.items[1].kind, 'audio');
   assert.equal(response.items[1].filename, 'A_Pin_Video_1_audio.m4a');
   assert.equal(response.items[1].mimeType, 'audio/mp4');
   const audioUrl = new URL(response.items[1].url);
   assert.equal(audioUrl.pathname, '/api/pinterest/download');
   assert.equal(audioUrl.searchParams.get('audioFormatId'), 'audio');
+});
+
+test('estimates merged video size from its separate video and audio formats', () => {
+  const response = buildPinterestResponse({
+    id: 'sized-pin',
+    formats: [
+      {
+        format_id: 'video',
+        url: 'https://v.pinimg.com/video.mp4',
+        ext: 'mp4',
+        vcodec: 'avc1',
+        acodec: 'none',
+        height: 1080,
+        filesize: 2_000_000,
+      },
+      {
+        format_id: 'audio',
+        url: 'https://v.pinimg.com/audio.m4a',
+        ext: 'm4a',
+        audio_ext: 'm4a',
+        vcodec: 'none',
+        acodec: 'mp4a',
+        filesize_approx: 200_000,
+      },
+    ],
+  }, 'https://www.pinterest.com/pin/123456789/', 'https://backend.example');
+
+  const video = response.items.find((item) => item.kind === 'video');
+  assert.ok(video);
+  assert.equal(video.sizeBytes, 2_200_000);
+  assert.equal(video.sizeIsEstimate, true);
+  assert.equal(new URL(video.previewUrl).origin, 'https://backend.example');
+});
+
+test('estimates merged video size from format bitrates and duration when sizes are missing', () => {
+  const response = buildPinterestResponse({
+    id: 'bitrate-pin',
+    duration: 10,
+    formats: [
+      {
+        format_id: 'video',
+        url: 'https://v.pinimg.com/video.mp4',
+        ext: 'mp4',
+        vcodec: 'avc1',
+        acodec: 'none',
+        height: 720,
+        vbr: 800,
+      },
+      {
+        format_id: 'audio',
+        url: 'https://v.pinimg.com/audio.m4a',
+        ext: 'm4a',
+        audio_ext: 'm4a',
+        vcodec: 'none',
+        acodec: 'mp4a',
+        abr: 128,
+      },
+    ],
+  }, 'https://www.pinterest.com/pin/123456789/');
+
+  const video = response.items.find((item) => item.kind === 'video');
+  assert.ok(video);
+  assert.equal(video.sizeBytes, 1_160_000);
+  assert.equal(video.sizeIsEstimate, true);
+  assert.equal(video.durationSeconds, 10);
 });
 
 test('turns yt-dlp format failures into app-specific messages', () => {

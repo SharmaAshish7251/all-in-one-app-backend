@@ -623,7 +623,7 @@ function renderSuccessResult(data) {
   mediaFilename.textContent = firstItem.filename || data.shareTitle || 'Media File';
   mediaFilename.title = mediaFilename.textContent;
 
-  mediaSizeTag.innerHTML = `<i class="fa-solid fa-hard-drive"></i> ${formatBytes(firstItem.sizeBytes)}`;
+  mediaSizeTag.innerHTML = `<i class="fa-solid fa-hard-drive"></i> ${firstItem.sizeIsEstimate ? '~' : ''}${formatBytes(firstItem.sizeBytes)}`;
   mediaTypeTag.innerHTML = `<i class="fa-solid fa-file"></i> ${firstItem.mimeType || 'binary'}`;
 
   if (firstItem.durationSeconds) {
@@ -661,7 +661,8 @@ function renderSuccessResult(data) {
 
     mediaFilename.textContent = item.filename || data.title || data.shareTitle || 'Media File';
     mediaFilename.title = mediaFilename.textContent;
-    mediaSizeTag.innerHTML = `<i class="fa-solid fa-hard-drive"></i> ${formatBytes(item.sizeBytes)}`;
+    const sizeLabel = `${item.sizeIsEstimate ? '~' : ''}${formatBytes(item.sizeBytes)}`;
+    mediaSizeTag.innerHTML = `<i class="fa-solid fa-hard-drive"></i> ${sizeLabel}`;
     mediaTypeTag.innerHTML = `<i class="fa-solid fa-file"></i> ${item.mimeType || 'binary'}`;
 
     btnDownloadFile.href = dlUrl;
@@ -683,7 +684,7 @@ function renderSuccessResult(data) {
       };
     }
 
-    btnStreamPreview.href = item.url || dlUrl;
+    btnStreamPreview.href = item.previewUrl || item.url || dlUrl;
     btnStreamPreview.onclick = (e) => {
       if (!hasBinary) {
         e.preventDefault();

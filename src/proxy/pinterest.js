@@ -129,7 +129,7 @@ async function prepareMedia(cachePath, params) {
   });
 }
 
-export async function handlePinterestDownload(req, res) {
+async function handlePinterestMedia(req, res, disposition) {
   const params = getSafeParams(req);
   if (params.error) return res.status(400).json({ error: params.error });
 
@@ -152,7 +152,7 @@ export async function handlePinterestDownload(req, res) {
 
     if (!res.headersSent) {
       res.setHeader('Content-Type', params.outputExt === 'mp4' ? 'video/mp4' : 'audio/mp4');
-      res.setHeader('Content-Disposition', `attachment; filename="${params.filename}"`);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${params.filename}"`);
       res.setHeader('Accept-Ranges', 'bytes');
       res.sendFile(cachePath, (error) => {
         if (error && !res.headersSent) {
@@ -167,4 +167,15 @@ export async function handlePinterestDownload(req, res) {
       res.status(502).json({ error: error.message });
     }
   }
+}
+
+export async function handlePinterestDownload(req, res) {
+  return handlePinterestMedia(req, res, 'attachment');
+}
+
+export async function handlePinterestPreview(req, res) {
+  if (!req.query.videoFormatId) {
+    return res.status(400).json({ error: 'A video format is required for Pinterest preview.' });
+  }
+  return handlePinterestMedia(req, res, 'inline');
 }

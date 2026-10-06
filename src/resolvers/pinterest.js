@@ -182,7 +182,7 @@ function makeVideoItems(entry, groupId, entryIndex, info) {
         sizeBytes: format.filesize ?? format.filesize_approx ?? null,
         quality,
         thumbnail: entry.thumbnail ?? info.thumbnail ?? undefined,
-        durationSeconds: entry.duration ?? undefined,
+        durationSeconds: entry.duration ?? info.duration ?? undefined,
         recommended: qualityIndex === 0,
       };
     });
@@ -279,6 +279,45 @@ function makeVideoThumbnailItem(entry, groupId, entryIndex, info) {
   };
 }
 
+function pinterestMediaUrl(pathname, sourceUrl, videoFormatId, audioFormatId, filename, backendBaseUrl) {
+  const mediaUrl = new URL(pathname, backendBaseUrl);
+  mediaUrl.searchParams.set('url', sourceUrl);
+  if (videoFormatId) mediaUrl.searchParams.set('videoFormatId', videoFormatId);
+  mediaUrl.searchParams.set('audioFormatId', audioFormatId);
+  mediaUrl.searchParams.set('filename', filename);
+  return mediaUrl.toString();
+}
+
+function estimatedFormatSize(format, durationSeconds) {
+  const fileSize = format.filesize ?? format.filesize_approx;
+  if (Number.isFinite(fileSize) && fileSize > 0) return fileSize;
+
+  const bitrateKbps = format.vbr ?? format.abr ?? format.tbr;
+  if (
+    Number.isFinite(bitrateKbps) &&
+    bitrateKbps > 0 &&
+    Number.isFinite(durationSeconds) &&
+    durationSeconds > 0
+  ) {
+    return Math.round((bitrateKbps * 1000 * durationSeconds) / 8);
+  }
+  return null;
+}
+
+function combinedFormatSize(videoFormat, audioFormat, durationSeconds) {
+  const videoSize = estimatedFormatSize(videoFormat, durationSeconds);
+  const audioSize = estimatedFormatSize(audioFormat, durationSeconds);
+  if (
+    Number.isFinite(videoSize) &&
+    videoSize > 0 &&
+    Number.isFinite(audioSize) &&
+    audioSize > 0
+  ) {
+    return videoSize + audioSize;
+  }
+  return null;
+}
+
 export function buildPinterestResponse(info, sourceUrl, backendBaseUrl = 'http://localhost:4000') {
   const groupId = safeFilenamePart(info.id ?? 'pin');
   const items = [];
@@ -315,17 +354,34 @@ export function buildPinterestResponse(info, sourceUrl, backendBaseUrl = 'http:/
           return item;
         }
 
-        const downloadUrl = new URL('/api/pinterest/download', backendBaseUrl);
-        downloadUrl.searchParams.set('url', sourceUrl);
-        downloadUrl.searchParams.set('videoFormatId', videoFormat.format_id);
-        downloadUrl.searchParams.set('audioFormatId', audioFormat.format_id);
-        downloadUrl.searchParams.set('filename', item.filename.replace(/\.[^.]+$/, '.mp4'));
+        const filename = item.filename.replace(/\.[^.]+$/, '.mp4');
+        const sizeBytes = combinedFormatSize(
+          videoFormat,
+          audioFormat,
+          entry.duration ?? info.duration,
+        );
         return {
           ...item,
-          url: downloadUrl.toString(),
-          filename: item.filename.replace(/\.[^.]+$/, '.mp4'),
+          url: pinterestMediaUrl(
+            '/api/pinterest/download',
+            sourceUrl,
+            videoFormat.format_id,
+            audioFormat.format_id,
+            filename,
+            backendBaseUrl,
+          ),
+          previewUrl: pinterestMediaUrl(
+            '/api/pinterest/preview',
+            sourceUrl,
+            videoFormat.format_id,
+            audioFormat.format_id,
+            filename,
+            backendBaseUrl,
+          ),
+          filename,
           mimeType: 'video/mp4',
-          sizeBytes: null,
+          sizeBytes,
+          ...(sizeBytes !== null ? { sizeIsEstimate: true } : {}),
           headers: {},
         };
       }));

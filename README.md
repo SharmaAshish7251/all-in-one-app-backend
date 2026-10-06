@@ -158,7 +158,7 @@ GET /api/download?dlink=<encoded_dlink>&filename=sample.mp4
 3. Select your repository.
 4. Set:
    - **Root Directory:** `backend`
-   - **Build Command:** `npm install`
+   - **Build Command:** `npm install && python3 -m pip install --upgrade "yt-dlp[default]"`
    - **Start Command:** `npm start`
 5. In **Environment Variables**, add:
    - `BASE_URL`: `https://your-app-name.onrender.com`

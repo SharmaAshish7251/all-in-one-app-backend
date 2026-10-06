@@ -239,6 +239,23 @@ export function saveYouTubeCookies(content) {
 }
 
 /**
+ * Find the node executable path for yt-dlp's JavaScript challenge solver.
+ */
+function getNodePath() {
+  try {
+    const nodeDir = path.dirname(process.execPath);
+    const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
+    const candidate = path.join(nodeDir, nodeName);
+    if (fs.existsSync(candidate)) return candidate;
+  } catch {}
+
+  for (const candidate of ['/usr/bin/node', '/usr/local/bin/node', '/opt/render/project/.nvm/versions/node/current/bin/node']) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return 'node';
+}
+
+/**
  * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
  *
  * Key points (yt-dlp >= 2025):
@@ -249,10 +266,11 @@ export function saveYouTubeCookies(content) {
  */
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
+  const nodePath = getNodePath();
   const args = [
     // node JS runtime solves YouTube's n-challenge (signature decryption).
     // Required for private/age-gated videos and for web client format URLs.
-    '--js-runtimes', 'node',
+    '--js-runtimes', `node:${nodePath}`,
     // Do NOT force a specific player_client:
     //  - `web`         → triggers SABR-only streaming on some videos (no direct stream URLs)
     //  - `web_embedded`→ only combined low-res formats (no separate video+audio for HD)

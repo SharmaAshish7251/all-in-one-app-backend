@@ -240,19 +240,22 @@ export function saveYouTubeCookies(content) {
 
 /**
  * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
- * Uses the Android InnerTube client which bypasses web-based bot challenges on datacenter IPs.
+ *
+ * Key points (yt-dlp >= 2025):
+ *  - `--js-runtimes node` is REQUIRED to solve YouTube's n-challenge (sig decryption).
+ *    Without it, even valid cookies produce "The page needs to be reloaded." errors.
+ *  - The `android` client silently skips cookies, so it must NOT be used when auth is needed.
+ *  - `web_embedded` + `web` clients support cookies and work with the node JS solver.
  */
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
   const args = [
-    // android client communicates with YouTube's mobile Protobuf/InnerTube API,
-    // which reliably extracts video streams on server/cloud IPs without web bot checks.
-    '--extractor-args',
-    'youtube:player_client=android,web',
-    '--add-header',
-    'User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-    '--sleep-requests',
-    '1',
+    // node JS runtime is required to solve YouTube's n-challenge (signature decryption).
+    // Without it yt-dlp cannot construct valid stream URLs on server/cloud IPs.
+    '--js-runtimes', 'node',
+    // web_embedded and web clients honour cookies; android/ios skip cookies silently.
+    '--extractor-args', 'youtube:player_client=web_embedded,web',
+    '--sleep-requests', '1',
   ];
 
   if (cookiePath) {

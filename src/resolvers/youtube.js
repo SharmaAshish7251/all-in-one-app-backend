@@ -250,11 +250,14 @@ export function saveYouTubeCookies(content) {
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
   const args = [
-    // node JS runtime is required to solve YouTube's n-challenge (signature decryption).
-    // Without it yt-dlp cannot construct valid stream URLs on server/cloud IPs.
+    // node JS runtime is REQUIRED to solve YouTube's n-challenge (signature decryption).
+    // Without it, yt-dlp cannot construct valid stream URLs even with valid cookies.
     '--js-runtimes', 'node',
-    // web_embedded and web clients honour cookies; android/ios skip cookies silently.
-    '--extractor-args', 'youtube:player_client=web_embedded,web',
+    // Use the default `web` client — gives all 40+ video/audio formats including separate
+    // streams needed for bv*+ba merging. web_embedded only returns combined low-res formats
+    // which causes "Requested format is not available" errors for quality selectors.
+    // android/ios clients silently skip cookies so they must NOT be used.
+    '--extractor-args', 'youtube:player_client=web',
     '--sleep-requests', '1',
   ];
 

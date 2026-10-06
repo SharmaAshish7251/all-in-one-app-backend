@@ -637,6 +637,18 @@ function renderSuccessResult(data) {
 
   // Buttons & Direct Stream Link state
   function selectMediaItem(item) {
+    let downloadUrl = item.url;
+    if (
+      data.platform === 'pinterest' &&
+      item.kind === 'image' &&
+      /^https:\/\//i.test(item.url || '')
+    ) {
+      const imageUrl = new URL('/api/pinterest/image', window.location.origin);
+      imageUrl.searchParams.set('url', item.url);
+      imageUrl.searchParams.set('filename', item.filename || 'pinterest_image.jpg');
+      downloadUrl = imageUrl.toString();
+    }
+
     const hasBinary = Boolean(item.url && (
       item.originalDlink ||
       item.url.includes('/api/download') ||
@@ -645,7 +657,7 @@ function renderSuccessResult(data) {
       item.url.includes('/api/pinterest/download') ||
       /^https:\/\//i.test(item.url)
     ));
-    const dlUrl = hasBinary ? item.url : data.sourceUrl || '#';
+    const dlUrl = hasBinary ? downloadUrl : data.sourceUrl || '#';
 
     mediaFilename.textContent = item.filename || data.title || data.shareTitle || 'Media File';
     mediaFilename.title = mediaFilename.textContent;
@@ -671,7 +683,7 @@ function renderSuccessResult(data) {
       };
     }
 
-    btnStreamPreview.href = dlUrl;
+    btnStreamPreview.href = item.url || dlUrl;
     btnStreamPreview.onclick = (e) => {
       if (!hasBinary) {
         e.preventDefault();

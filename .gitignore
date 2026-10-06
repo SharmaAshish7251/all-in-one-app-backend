@@ -6,6 +6,7 @@ node_modules/
 cache/
 temp_media/
 
-# Allow permanent cookies folder to be tracked for server deployments
-!cookies/
-!cookies/**
+*cookies*.txt
+.kilo/
+cookies/
+src/resolvers/youtube.txt

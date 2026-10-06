@@ -37,8 +37,8 @@ function main() {
     fs.writeFileSync(cookieFile, encrypted, 'utf8');
     secureFilePermissions(cookieFile);
     console.log(`🔒 Encrypted ${cookieFile} successfully with AES-256-GCM!`);
-    console.log('💡 The file can now safely be committed and pushed to GitHub.');
-    console.log('   The backend will automatically decrypt it at runtime when making requests.');
+    console.log('💡 Set COOKIE_SECRET to a unique, strong passphrase in the runtime environment.');
+    console.log('   Never commit cookie files, whether encrypted or plaintext.');
   }
 }
 

@@ -6,8 +6,8 @@ This directory stores session cookies used to authenticate `yt-dlp` requests and
 
 1. **AES-256-GCM Encryption at Rest**:
    - The cookie file `cookies/youtube.txt` is encrypted using AES-256-GCM.
-   - Plaintext credentials (e.g., Google account tokens, OSID, SID) are never exposed in git history or GitHub.
    - The backend automatically decrypts the file at runtime into a protected, ephemeral memory/file sandbox.
+   - Encryption does not make a cookie file safe to commit; keep plaintext and encrypted cookie files out of Git.
 
 2. **File Permissions (0600)**:
    - On Linux/POSIX systems, files are restricted to `0600` (readable and writable only by the process owner).
@@ -29,4 +29,4 @@ This directory stores session cookies used to authenticate `yt-dlp` requests and
   npm run decrypt-cookies
   ```
 
-Optional: Set `COOKIE_SECRET` in your `.env` or cloud environment variables for a custom encryption passphrase. If omitted, a secure project-derived key is used automatically.
+Set `COOKIE_SECRET` to a unique, strong passphrase both when encrypting cookies and when running the backend. The built-in fallback is not suitable for protecting real cookies. Keep the secret in your environment and never commit it or cookie files.

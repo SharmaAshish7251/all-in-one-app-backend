@@ -402,11 +402,13 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  const ytCookiePath = getYouTubeCookieFilePath();
   console.log('----------------------------------------------------');
   console.log(`🚀 All-in-One Downloader Backend running on port ${PORT}`);
   console.log(`🔗 Local URL: ${BASE_URL}`);
   console.log(`📊 Admin Dashboard: ${BASE_URL}/dashboard`);
   console.log(`⚙️  TeraBox Mode: ${runtimeConfig.teraboxMode.toUpperCase()}`);
   console.log(`🍪 TeraBox Cookie configured: ${runtimeConfig.teraboxCookie ? 'YES' : 'NO'}`);
+  console.log(`🍪 YouTube Cookies detected: ${ytCookiePath ? `YES (${ytCookiePath})` : 'NO (Unauthenticated)'}`);
   console.log('----------------------------------------------------');
 });

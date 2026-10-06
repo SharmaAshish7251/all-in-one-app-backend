@@ -109,14 +109,34 @@ function sanitizeFilename(name) {
  * If the cookie file is encrypted with AES-256-GCM, it decrypts it securely to a protected runtime path.
  */
 export function getYouTubeCookieFilePath() {
+  const sameDir = __dirname;
+  const srcDir = path.resolve(__dirname, '../');
+  const cwdDir = process.cwd();
+
   const candidates = [
     process.env.YOUTUBE_COOKIES_FILE,
+    // Same folder as this file (src/resolvers/)
+    path.join(sameDir, 'youtube.txt'),
+    path.join(sameDir, 'cookies.txt'),
+    path.join(sameDir, 'youtube_cookies.txt'),
+    path.join(sameDir, 'youtube.enc'),
+    // src/ folder
+    path.join(srcDir, 'youtube.txt'),
+    path.join(srcDir, 'cookies.txt'),
+    path.join(srcDir, 'youtube_cookies.txt'),
+    // cookies/ folder
     PRIMARY_COOKIE_FILE,
     path.join(COOKIES_DIR, 'youtube.enc'),
     path.join(COOKIES_DIR, 'youtube_cookies.txt'),
     path.join(COOKIES_DIR, 'cookies.txt'),
+    // Project root / working directory
+    path.join(ROOT_DIR, 'youtube.txt'),
     path.join(ROOT_DIR, 'cookies.txt'),
     path.join(ROOT_DIR, 'youtube_cookies.txt'),
+    path.join(cwdDir, 'youtube.txt'),
+    path.join(cwdDir, 'cookies.txt'),
+    path.join(cwdDir, 'youtube_cookies.txt'),
+    path.join(cwdDir, 'cookies', 'youtube.txt'),
     TEMP_YOUTUBE_COOKIES_PATH,
   ];
 
@@ -135,11 +155,23 @@ export function getYouTubeCookieFilePath() {
             }
             fs.writeFileSync(RUNTIME_DECRYPTED_COOKIE_PATH, decrypted, 'utf8');
             secureFilePermissions(RUNTIME_DECRYPTED_COOKIE_PATH);
+
+            if (!decrypted.includes('LOGIN_INFO')) {
+              console.warn(`[YouTube Auth] Cookie file loaded (${candidate}), but LOGIN_INFO is missing. For datacenter IPs, make sure you are signed into youtube.com when exporting.`);
+            } else {
+              console.log(`[YouTube Auth] Authenticated session cookie loaded successfully from: ${candidate}`);
+            }
+
             return RUNTIME_DECRYPTED_COOKIE_PATH;
           }
 
           // Plaintext file - enforce owner-only permissions
           secureFilePermissions(candidate);
+          if (!raw.includes('LOGIN_INFO')) {
+            console.warn(`[YouTube Auth] Cookie file loaded (${candidate}), but LOGIN_INFO is missing. For datacenter IPs, make sure you are signed into youtube.com when exporting.`);
+          } else {
+            console.log(`[YouTube Auth] Authenticated session cookie loaded successfully from: ${candidate}`);
+          }
           return candidate;
         }
       } catch (err) {

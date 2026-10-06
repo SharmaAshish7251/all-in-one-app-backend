@@ -150,16 +150,28 @@ export function saveYouTubeCookies(content) {
 
 /**
  * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
+ * Uses a combination of reliable player clients and optional cookie auth.
  */
 export function getYouTubeYtDlpArgs() {
-  const args = [
-    '--extractor-args',
-    'youtube:player_client=mweb,android,web_safari,web',
-  ];
   const cookiePath = getYouTubeCookieFilePath();
+
+  const args = [
+    // Use tv_embedded + ios — these clients bypass bot checks without needing po_token
+    // ios has its own token system; tv_embedded works on server IPs
+    '--extractor-args',
+    'youtube:player_client=tv_embedded,ios,mweb',
+    // Add a realistic browser user-agent to avoid datacenter IP flagging
+    '--add-header',
+    'User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
+    // Small delay between requests to avoid rate-limiting
+    '--sleep-requests',
+    '1',
+  ];
+
   if (cookiePath) {
     args.push('--cookies', cookiePath);
   }
+
   return args;
 }
 
@@ -198,8 +210,14 @@ export async function resolveYouTube(url, options = {}) {
     proc.on('close', (code) => {
       if (code !== 0) {
         let msg = stderrData || `Exit code ${code}`;
-        if (msg.includes("confirm you're not a bot") || msg.includes('Sign in to confirm')) {
-          msg = "YouTube bot detection triggered on server IP. Configure YouTube cookies in backend environment variables (YOUTUBE_COOKIES) or dashboard to authenticate.";
+        const isBotDetection =
+          msg.includes("confirm you're not a bot") ||
+          msg.includes('Sign in to confirm') ||
+          msg.includes('HTTP Error 403') ||
+          msg.includes('Precondition check failed') ||
+          msg.includes('This content isn\'t available');
+        if (isBotDetection) {
+          msg = "YouTube bot detection triggered. To fix: open the backend dashboard, expand the YouTube Cookies section, export your cookies.txt from youtube.com using the 'Get cookies.txt LOCALLY' browser extension, and paste them in. Alternatively, set the YOUTUBE_COOKIES environment variable.";
         }
         return reject(
           new Error(`Failed to extract YouTube video: ${msg}`)

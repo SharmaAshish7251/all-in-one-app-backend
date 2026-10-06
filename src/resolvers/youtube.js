@@ -250,14 +250,15 @@ export function saveYouTubeCookies(content) {
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
   const args = [
-    // node JS runtime is REQUIRED to solve YouTube's n-challenge (signature decryption).
-    // Without it, yt-dlp cannot construct valid stream URLs even with valid cookies.
+    // node JS runtime solves YouTube's n-challenge (signature decryption).
+    // Required for private/age-gated videos and for web client format URLs.
     '--js-runtimes', 'node',
-    // Use the default `web` client — gives all 40+ video/audio formats including separate
-    // streams needed for bv*+ba merging. web_embedded only returns combined low-res formats
-    // which causes "Requested format is not available" errors for quality selectors.
-    // android/ios clients silently skip cookies so they must NOT be used.
-    '--extractor-args', 'youtube:player_client=web',
+    // Do NOT force a specific player_client:
+    //  - `web`         → triggers SABR-only streaming on some videos (no direct stream URLs)
+    //  - `web_embedded`→ only combined low-res formats (no separate video+audio for HD)
+    //  - `android/ios` → silently skip cookies
+    // yt-dlp's default selection (visionos HLS fallback) gives 40+ formats on all public
+    // videos without SABR issues. Cookies are used automatically when present for private video.
     '--sleep-requests', '1',
   ];
 

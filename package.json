@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "encrypt-cookies": "node scripts/encrypt_cookies.js encrypt",
-    "decrypt-cookies": "node scripts/encrypt_cookies.js decrypt"
+    "decrypt-cookies": "node scripts/encrypt_cookies.js decrypt",
+    "test": "node --test"
   },
   "dependencies": {
     "axios": "^1.8.1",

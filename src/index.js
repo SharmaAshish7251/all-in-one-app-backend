@@ -6,9 +6,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isTeraBoxUrl, resolveTeraBox, testTeraBoxCookie, formatCookie } from './resolvers/terabox.js';
 import { isTwitterUrl, resolveTwitter } from './resolvers/twitter.js';
+import { isInstagramUrl, resolveInstagram } from './resolvers/instagram.js';
+import { isPinterestUrl, resolvePinterest } from './resolvers/pinterest.js';
 import { isYouTubeUrl, resolveYouTube, getYouTubeCookieFilePath, saveYouTubeCookies } from './resolvers/youtube.js';
 import { handleStreamDownload } from './proxy/stream.js';
 import { handleYouTubeDownload } from './proxy/youtube.js';
+import { handleInstagramDownload } from './proxy/instagram.js';
+import { handlePinterestDownload } from './proxy/pinterest.js';
 
 dotenv.config();
 
@@ -135,7 +139,7 @@ app.get('/', (req, res) => {
     name: 'All-in-One Downloader Backend',
     status: 'running',
     dashboardUrl: `${BASE_URL}/dashboard`,
-    supportedPlatforms: ['terabox', 'twitter/x', 'youtube'],
+    supportedPlatforms: ['terabox', 'twitter/x', 'youtube', 'instagram', 'pinterest'],
     endpoints: {
       dashboard: 'GET /dashboard',
       health: 'GET /health',
@@ -143,6 +147,7 @@ app.get('/', (req, res) => {
       resolveGet: 'GET /api/resolve?url=...',
       streamDownload: 'GET /api/download?dlink=...&filename=...',
       youtubeDownload: 'GET /api/youtube/download?id=...&format=...&filename=...',
+      pinterestDownload: 'GET /api/pinterest/download?url=...&videoFormatId=...&audioFormatId=...',
       configGet: 'GET /api/config',
       configPost: 'POST /api/config',
       testCookie: 'POST /api/test-cookie',
@@ -343,7 +348,23 @@ async function handleResolve(req, res, method = 'POST') {
       return res.json(result);
     }
 
-    // 3. YouTube check
+    // 3. Instagram check
+    if (isInstagramUrl(cleanUrl)) {
+      const result = await resolveInstagram(cleanUrl, { backendBaseUrl: effectiveBaseUrl });
+      const latencyMs = Date.now() - start;
+      addLogEntry({ method, url: cleanUrl, platform: 'instagram', status: 200, latencyMs });
+      return res.json(result);
+    }
+
+    // 4. Pinterest check
+    if (isPinterestUrl(cleanUrl)) {
+      const result = await resolvePinterest(cleanUrl, { backendBaseUrl: effectiveBaseUrl });
+      const latencyMs = Date.now() - start;
+      addLogEntry({ method, url: cleanUrl, platform: 'pinterest', status: 200, latencyMs });
+      return res.json(result);
+    }
+
+    // 5. YouTube check
     if (isYouTubeUrl(cleanUrl)) {
       const result = await resolveYouTube(cleanUrl, {
         backendBaseUrl: effectiveBaseUrl,
@@ -353,7 +374,7 @@ async function handleResolve(req, res, method = 'POST') {
       return res.json(result);
     }
 
-    // 4. Unsupported
+    // 6. Unsupported
     const latencyMs = Date.now() - start;
     addLogEntry({ method, url: cleanUrl, platform: 'unsupported', status: 422, latencyMs });
     return res.status(422).json({
@@ -365,7 +386,18 @@ async function handleResolve(req, res, method = 'POST') {
   } catch (err) {
     const latencyMs = Date.now() - start;
     console.error(`[Resolve Error] ${cleanUrl}:`, err.message);
-    addLogEntry({ method, url: cleanUrl, platform: isTeraBoxUrl(cleanUrl) ? 'terabox' : 'unknown', status: 400, latencyMs, error: err.message });
+    const failedPlatform = isTeraBoxUrl(cleanUrl)
+      ? 'terabox'
+      : isTwitterUrl(cleanUrl)
+        ? 'twitter'
+        : isInstagramUrl(cleanUrl)
+          ? 'instagram'
+          : isPinterestUrl(cleanUrl)
+            ? 'pinterest'
+            : isYouTubeUrl(cleanUrl)
+              ? 'youtube'
+              : 'unknown';
+    addLogEntry({ method, url: cleanUrl, platform: failedPlatform, status: 400, latencyMs, error: err.message });
     return res.status(400).json({
       error: {
         code: 'RESOLVE_FAILED',
@@ -393,6 +425,16 @@ app.get('/api/download', async (req, res) => {
 // GET /api/youtube/download — streaming proxy for YouTube media
 app.get('/api/youtube/download', async (req, res) => {
   await handleYouTubeDownload(req, res);
+});
+
+// GET /api/instagram/download — merge a selected video quality with its audio track
+app.get('/api/instagram/download', async (req, res) => {
+  await handleInstagramDownload(req, res);
+});
+
+// GET /api/pinterest/download — merge separate Pin video/audio streams
+app.get('/api/pinterest/download', async (req, res) => {
+  await handlePinterestDownload(req, res);
 });
 
 // 404 Handler

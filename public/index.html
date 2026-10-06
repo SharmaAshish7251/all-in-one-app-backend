@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIO Backend Control Center & TeraBox Resolver</title>
+  <title>AIO Backend Control Center & Media Resolver</title>
   <meta name="description" content="Admin dashboard for All-in-One Downloader backend with Auto & Custom TeraBox resolver management, health telemetry, and live testing sandbox." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -334,7 +334,7 @@
                 type="url"
                 id="resolve-input-url"
                 class="form-control url-input"
-                placeholder="Paste YouTube, TeraBox, or Twitter/X share URL here..."
+                placeholder="Paste YouTube, TeraBox, Twitter/X, Instagram, or Pinterest URL here..."
                 required
               />
               <button type="submit" id="btn-resolve" class="btn btn-primary btn-resolve">
@@ -353,6 +353,13 @@
               <button type="button" class="btn-chip" id="sample-tw-btn">
                 <i class="fa-brands fa-x-twitter"></i> Twitter/X Sample
               </button>
+              <button type="button" class="btn-chip" id="sample-ig-btn" title="Load the Instagram reel sample URL">
+                <i class="fa-brands fa-instagram" style="color: #d82d7e;"></i> Instagram Sample
+              </button>
+              <button type="button" class="btn-chip" id="sample-pin-btn" title="Load a Pinterest video Pin sample URL">
+                <i class="fa-brands fa-pinterest-p" style="color: #e60023;"></i> Pinterest Sample
+              </button>
+              <span class="examples-label">Sample reel URL; availability depends on Instagram access.</span>
             </div>
           </form>
 

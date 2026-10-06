@@ -301,14 +301,25 @@ export async function resolveYouTube(url, options = {}) {
 
     proc.on('close', (code) => {
       if (code !== 0) {
-        console.error(`[YouTube yt-dlp stderr (${code})]:`, stderrData.slice(0, 500));
+        console.error(`[YouTube yt-dlp stderr (${code})]:`, stderrData.slice(0, 800));
         let msg = stderrData || `Exit code ${code}`;
+
+        const isExpiredCookies =
+          msg.includes('no longer valid') ||
+          msg.includes('cookies are no longer valid') ||
+          msg.includes('have been rotated');
+
         const isBotDetection =
           msg.includes("confirm you're not a bot") ||
           msg.includes('Sign in to confirm') ||
-          msg.includes('Sign in to view');
-        if (isBotDetection) {
-          msg = "YouTube bot detection triggered on server IP. Ensure active YouTube cookies (with LOGIN_INFO from youtube.com) are configured in cookies/youtube.txt or dashboard.";
+          msg.includes('Sign in to view') ||
+          msg.includes('This video is only available to Music Premium members') ||
+          msg.includes('This video requires payment');
+
+        if (isExpiredCookies) {
+          msg = 'YouTube cookies have expired (browser rotated them). Please re-export fresh cookies from youtube.com using the "Get cookies.txt LOCALLY" extension and update cookies/youtube.txt.';
+        } else if (isBotDetection) {
+          msg = 'YouTube bot detection triggered on server IP. Ensure active YouTube cookies (with LOGIN_INFO from youtube.com) are configured in cookies/youtube.txt or dashboard.';
         }
         return reject(
           new Error(`Failed to extract YouTube video: ${msg}`)

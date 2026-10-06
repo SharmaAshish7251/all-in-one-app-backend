@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { decryptData, isContentEncrypted, secureFilePermissions } from '../utils/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,7 @@ const COOKIES_DIR = path.join(ROOT_DIR, 'cookies');
 const PRIMARY_COOKIE_FILE = path.join(COOKIES_DIR, 'youtube.txt');
 const TEMP_COOKIES_DIR = path.join(ROOT_DIR, 'temp_media');
 const TEMP_YOUTUBE_COOKIES_PATH = path.join(TEMP_COOKIES_DIR, 'youtube_cookies.txt');
+const RUNTIME_DECRYPTED_COOKIE_PATH = path.join(TEMP_COOKIES_DIR, '.runtime_decrypted_cookies.txt');
 
 // Known or detected ffmpeg binary
 let cachedFfmpegPath = null;
@@ -104,11 +106,13 @@ function sanitizeFilename(name) {
 /**
  * Get the path to YouTube cookies if available.
  * Checks YOUTUBE_COOKIES_FILE, permanent files in cookies/, root, or YOUTUBE_COOKIES env var.
+ * If the cookie file is encrypted with AES-256-GCM, it decrypts it securely to a protected runtime path.
  */
 export function getYouTubeCookieFilePath() {
   const candidates = [
     process.env.YOUTUBE_COOKIES_FILE,
     PRIMARY_COOKIE_FILE,
+    path.join(COOKIES_DIR, 'youtube.enc'),
     path.join(COOKIES_DIR, 'youtube_cookies.txt'),
     path.join(COOKIES_DIR, 'cookies.txt'),
     path.join(ROOT_DIR, 'cookies.txt'),
@@ -119,10 +123,28 @@ export function getYouTubeCookieFilePath() {
   for (const candidate of candidates) {
     if (candidate && fs.existsSync(candidate)) {
       try {
-        if (fs.statSync(candidate).size > 10) {
+        const stat = fs.statSync(candidate);
+        if (stat.size > 10) {
+          const raw = fs.readFileSync(candidate, 'utf8').trim();
+
+          // Check if encrypted with AES-256-GCM
+          if (isContentEncrypted(raw)) {
+            const decrypted = decryptData(raw);
+            if (!fs.existsSync(TEMP_COOKIES_DIR)) {
+              fs.mkdirSync(TEMP_COOKIES_DIR, { recursive: true });
+            }
+            fs.writeFileSync(RUNTIME_DECRYPTED_COOKIE_PATH, decrypted, 'utf8');
+            secureFilePermissions(RUNTIME_DECRYPTED_COOKIE_PATH);
+            return RUNTIME_DECRYPTED_COOKIE_PATH;
+          }
+
+          // Plaintext file - enforce owner-only permissions
+          secureFilePermissions(candidate);
           return candidate;
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[YouTube] Error reading cookie file ${candidate}:`, err.message);
+      }
     }
   }
 
@@ -133,8 +155,10 @@ export function getYouTubeCookieFilePath() {
         fs.mkdirSync(COOKIES_DIR, { recursive: true });
       }
       let content = envCookie.trim();
-      // Decode base64 if user encoded raw Netscape cookie content
-      if (content.startsWith('ey') || (!content.includes('\t') && content.length > 50 && /^[A-Za-z0-9+/=]+$/.test(content))) {
+      // Check if encrypted
+      if (isContentEncrypted(content)) {
+        content = decryptData(content);
+      } else if (content.startsWith('ey') || (!content.includes('\t') && content.length > 50 && /^[A-Za-z0-9+/=]+$/.test(content))) {
         try {
           const decoded = Buffer.from(content, 'base64').toString('utf8');
           if (decoded.includes('youtube.com') || decoded.includes('# Netscape')) {
@@ -143,6 +167,7 @@ export function getYouTubeCookieFilePath() {
         } catch {}
       }
       fs.writeFileSync(PRIMARY_COOKIE_FILE, content, 'utf8');
+      secureFilePermissions(PRIMARY_COOKIE_FILE);
       return PRIMARY_COOKIE_FILE;
     } catch (e) {
       console.warn('[YouTube] Failed to write cookie file from env:', e.message);
@@ -166,6 +191,7 @@ export function saveYouTubeCookies(content) {
       fs.mkdirSync(COOKIES_DIR, { recursive: true });
     }
     fs.writeFileSync(PRIMARY_COOKIE_FILE, cleanContent, 'utf8');
+    secureFilePermissions(PRIMARY_COOKIE_FILE);
   } catch (e) {
     console.warn('[YouTube] Failed to write to permanent cookies folder:', e.message);
   }
@@ -176,6 +202,7 @@ export function saveYouTubeCookies(content) {
       fs.mkdirSync(TEMP_COOKIES_DIR, { recursive: true });
     }
     fs.writeFileSync(TEMP_YOUTUBE_COOKIES_PATH, cleanContent, 'utf8');
+    secureFilePermissions(TEMP_YOUTUBE_COOKIES_PATH);
   } catch {}
 }
 

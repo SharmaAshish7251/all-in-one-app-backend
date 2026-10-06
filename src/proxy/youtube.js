@@ -62,9 +62,14 @@ export async function handleYouTubeDownload(req, res) {
   }
 
   const cleanId = id.trim();
+  // Strict format validation to prevent path traversal or injection
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(cleanId)) {
+    return res.status(400).json({ error: 'Invalid YouTube video ID format.' });
+  }
+
   const formatSelector = format || 'bv*+ba/b/best';
   const targetUrl = `https://www.youtube.com/watch?v=${cleanId}`;
-  const safeFilename = filename.replace(/["\r\n]/g, '_');
+  const safeFilename = path.basename(filename || 'youtube_video.mp4').replace(/["\r\n]/g, '_');
 
   const isDownload = req.query.download === '1' || req.query.dl === '1';
   const outputExt = ext === 'm4a' || ext === 'mp3' ? ext : 'mp4';

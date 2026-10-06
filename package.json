@@ -7,7 +7,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "encrypt-cookies": "node scripts/encrypt_cookies.js encrypt",
+    "decrypt-cookies": "node scripts/encrypt_cookies.js decrypt"
   },
   "dependencies": {
     "axios": "^1.8.1",

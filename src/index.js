@@ -87,6 +87,31 @@ function persistConfigToEnv(cookie, mode, rapidApiKey) {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Security Guard: Block any external attempt to access sensitive credentials or directories
+app.use((req, res, next) => {
+  const reqPath = decodeURIComponent(req.path || '').toLowerCase();
+  const forbiddenPatterns = [
+    '/cookies',
+    'cookies.txt',
+    'youtube.txt',
+    '.env',
+    '.git',
+    'temp_media',
+    'package.json',
+    'src/',
+    'scripts/',
+    '..',
+  ];
+
+  if (forbiddenPatterns.some((pattern) => reqPath.includes(pattern))) {
+    return res.status(403).json({
+      error: { code: 'FORBIDDEN', message: 'Access denied: sensitive resource.' },
+    });
+  }
+  next();
+});
+
 app.use(express.static(publicPath));
 
 // Request logging middleware

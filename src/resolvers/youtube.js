@@ -208,27 +208,24 @@ export function saveYouTubeCookies(content) {
 
 /**
  * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
- * When cookies are present, yt-dlp uses authentic user credentials to unlock all streams.
+ * Uses the Android InnerTube client which bypasses web-based bot challenges on datacenter IPs.
  */
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
-  const args = [];
+  const args = [
+    // android client communicates with YouTube's mobile Protobuf/InnerTube API,
+    // which reliably extracts video streams on server/cloud IPs without web bot checks.
+    '--extractor-args',
+    'youtube:player_client=android,web',
+    '--add-header',
+    'User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+    '--sleep-requests',
+    '1',
+  ];
 
   if (cookiePath) {
-    // Authenticated session: let yt-dlp use web/mobile clients with authentic cookies
     args.push('--cookies', cookiePath);
-  } else {
-    // Unauthenticated fallback: attempt bot check bypass with alternative clients
-    args.push('--extractor-args', 'youtube:player_client=tv_embedded,ios,mweb');
   }
-
-  // Standard safe browser headers and rate limit protection
-  args.push(
-    '--add-header',
-    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    '--sleep-requests',
-    '1'
-  );
 
   return args;
 }
@@ -246,8 +243,6 @@ export async function resolveYouTube(url, options = {}) {
       '-m', 'yt_dlp',
       '--dump-single-json',
       '--no-playlist',
-      '--remote-components', 'ejs:github',
-      '--js-runtimes', 'node',
       '--no-warnings',
       ...getYouTubeYtDlpArgs(),
       targetUrl,
@@ -267,15 +262,14 @@ export async function resolveYouTube(url, options = {}) {
 
     proc.on('close', (code) => {
       if (code !== 0) {
+        console.error(`[YouTube yt-dlp stderr (${code})]:`, stderrData.slice(0, 500));
         let msg = stderrData || `Exit code ${code}`;
         const isBotDetection =
           msg.includes("confirm you're not a bot") ||
           msg.includes('Sign in to confirm') ||
-          msg.includes('HTTP Error 403') ||
-          msg.includes('Precondition check failed') ||
-          msg.includes('This content isn\'t available');
+          msg.includes('Sign in to view');
         if (isBotDetection) {
-          msg = "YouTube bot detection triggered. To fix: open the backend dashboard, expand the YouTube Cookies section, export your cookies.txt from youtube.com using the 'Get cookies.txt LOCALLY' browser extension, and paste them in. Alternatively, set the YOUTUBE_COOKIES environment variable.";
+          msg = "YouTube bot detection triggered on server IP. Ensure active YouTube cookies (with LOGIN_INFO from youtube.com) are configured in cookies/youtube.txt or dashboard.";
         }
         return reject(
           new Error(`Failed to extract YouTube video: ${msg}`)

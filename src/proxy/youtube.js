@@ -139,8 +139,6 @@ export async function handleYouTubeDownload(req, res) {
     const args = [
       '-m', 'yt_dlp',
       '--ffmpeg-location', ffmpegPath,
-      '--remote-components', 'ejs:github',
-      '--js-runtimes', 'node',
       '-f', formatSelector,
       '--merge-output-format', outputExt,
       '--no-playlist',

@@ -84,6 +84,8 @@ const btnResolveIcon = document.getElementById('btn-resolve-icon');
 const sampleTbBtn = document.getElementById('sample-tb-btn');
 const sampleTwBtn = document.getElementById('sample-tw-btn');
 const sampleYtBtn = document.getElementById('sample-yt-btn');
+const sampleIgBtn = document.getElementById('sample-ig-btn');
+const samplePinBtn = document.getElementById('sample-pin-btn');
 
 const resolveResultBox = document.getElementById('resolve-result-box');
 const resolveSkeleton = document.getElementById('resolve-skeleton');
@@ -522,6 +524,20 @@ if (sampleYtBtn) {
   });
 }
 
+if (sampleIgBtn) {
+  sampleIgBtn.addEventListener('click', () => {
+    resolveInputUrl.value = 'https://www.instagram.com/reel/DeDUrYiyeVB/?stkn=Y2R6b2N5dHd6NzVl';
+    resolveInputUrl.focus();
+  });
+}
+
+if (samplePinBtn) {
+  samplePinBtn.addEventListener('click', () => {
+    resolveInputUrl.value = 'https://www.pinterest.com/pin/77476056088068212/';
+    resolveInputUrl.focus();
+  });
+}
+
 resolveForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = resolveInputUrl.value.trim();
@@ -621,7 +637,14 @@ function renderSuccessResult(data) {
 
   // Buttons & Direct Stream Link state
   function selectMediaItem(item) {
-    const hasBinary = Boolean(item.url && (item.originalDlink || item.url.includes('/api/download') || item.url.includes('/api/youtube/download')));
+    const hasBinary = Boolean(item.url && (
+      item.originalDlink ||
+      item.url.includes('/api/download') ||
+      item.url.includes('/api/youtube/download') ||
+      item.url.includes('/api/instagram/download') ||
+      item.url.includes('/api/pinterest/download') ||
+      /^https:\/\//i.test(item.url)
+    ));
     const dlUrl = hasBinary ? item.url : data.sourceUrl || '#';
 
     mediaFilename.textContent = item.filename || data.title || data.shareTitle || 'Media File';

@@ -1,6 +1,6 @@
 # All-in-One Downloader — Standalone Node.js Backend
 
-A lightweight, dedicated Node.js backend resolver and streaming proxy for **TeraBox** and **Twitter / X**.
+A lightweight Node.js backend resolver and streaming proxy for **TeraBox**, **Twitter / X**, **YouTube**, public **Instagram** posts, and **Pinterest** pins.
 
 ---
 
@@ -17,6 +17,11 @@ A lightweight, dedicated Node.js backend resolver and streaming proxy for **Tera
 - **Streaming Proxy (`/api/download`):** Forwards file downloads while injecting required session cookies and headers (`Referer`, `Cookie`, `User-Agent`), so clients (React Native app, browsers, download managers) can download files directly without getting 403 Forbidden.
 - **Range Header Support:** Enables resumable downloads and video streaming/seeking.
 - **Twitter / X Resolver:** Built-in resolution for Twitter videos and photos.
+- **Instagram Resolver:** Resolves public posts, reels, and video posts, including carousel media and available video qualities. Private or login-gated content is not supported.
+- **Instagram Audio Merging:** Combines separate Instagram video and audio tracks into a single MP4 download through the backend.
+- **Pinterest Resolver:** Resolves public Pinterest pins and short `pin.it` links into downloadable video qualities, cover images, or image Pins. Private or login-gated content is not supported.
+- **Pinterest Audio Merging:** Combines separate Pinterest HLS video and audio tracks into MP4 downloads; an audio-only M4A option is offered when available.
+- **YouTube Resolver:** Extracts video qualities and audio options with `yt-dlp`.
 - **Client Agnostic:** Can be consumed directly by the React Native mobile app (`worker.ts`), browser, or cURL.
 
 ---
@@ -138,6 +143,10 @@ Content-Type: application/json
 ```
 
 > **Note:** The `url` field in each item is a direct download link routed through `/api/download`, allowing the mobile app or browser to download the file directly with no cookie errors!
+
+Instagram post and reel URLs use the same `POST /resolve` endpoint. Resolution uses the backend's existing `yt-dlp` installation and returns public media items, including carousel entries and available video qualities. When Instagram exposes audio separately from video, downloads are merged into a single MP4 by `GET /api/instagram/download`. Private posts, stories, and login-gated content are not supported.
+
+Pinterest Pin URLs use the same `POST /resolve` endpoint. When Pinterest exposes separate HLS video and audio streams, video qualities are merged by `GET /api/pinterest/download`; an audio-only M4A option is also provided. Pins for which yt-dlp exposes no downloadable formats cannot be resolved.
 
 ---
 

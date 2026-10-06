@@ -5,8 +5,11 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const COOKIES_DIR = path.resolve(__dirname, '../../temp_media');
-const YOUTUBE_COOKIES_PATH = path.join(COOKIES_DIR, 'youtube_cookies.txt');
+const ROOT_DIR = path.resolve(__dirname, '../../');
+const COOKIES_DIR = path.join(ROOT_DIR, 'cookies');
+const PRIMARY_COOKIE_FILE = path.join(COOKIES_DIR, 'youtube.txt');
+const TEMP_COOKIES_DIR = path.join(ROOT_DIR, 'temp_media');
+const TEMP_YOUTUBE_COOKIES_PATH = path.join(TEMP_COOKIES_DIR, 'youtube_cookies.txt');
 
 // Known or detected ffmpeg binary
 let cachedFfmpegPath = null;
@@ -100,19 +103,29 @@ function sanitizeFilename(name) {
 
 /**
  * Get the path to YouTube cookies if available.
- * Checks YOUTUBE_COOKIES_FILE, existing written cookies, or YOUTUBE_COOKIES env var.
+ * Checks YOUTUBE_COOKIES_FILE, permanent files in cookies/, root, or YOUTUBE_COOKIES env var.
  */
 export function getYouTubeCookieFilePath() {
-  if (process.env.YOUTUBE_COOKIES_FILE && fs.existsSync(process.env.YOUTUBE_COOKIES_FILE)) {
-    return process.env.YOUTUBE_COOKIES_FILE;
+  const candidates = [
+    process.env.YOUTUBE_COOKIES_FILE,
+    PRIMARY_COOKIE_FILE,
+    path.join(COOKIES_DIR, 'youtube_cookies.txt'),
+    path.join(COOKIES_DIR, 'cookies.txt'),
+    path.join(ROOT_DIR, 'cookies.txt'),
+    path.join(ROOT_DIR, 'youtube_cookies.txt'),
+    TEMP_YOUTUBE_COOKIES_PATH,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      try {
+        if (fs.statSync(candidate).size > 10) {
+          return candidate;
+        }
+      } catch {}
+    }
   }
-  if (fs.existsSync(YOUTUBE_COOKIES_PATH)) {
-    try {
-      if (fs.statSync(YOUTUBE_COOKIES_PATH).size > 0) {
-        return YOUTUBE_COOKIES_PATH;
-      }
-    } catch {}
-  }
+
   const envCookie = process.env.YOUTUBE_COOKIES;
   if (envCookie && envCookie.trim()) {
     try {
@@ -129,48 +142,66 @@ export function getYouTubeCookieFilePath() {
           }
         } catch {}
       }
-      fs.writeFileSync(YOUTUBE_COOKIES_PATH, content, 'utf8');
-      return YOUTUBE_COOKIES_PATH;
+      fs.writeFileSync(PRIMARY_COOKIE_FILE, content, 'utf8');
+      return PRIMARY_COOKIE_FILE;
     } catch (e) {
       console.warn('[YouTube] Failed to write cookie file from env:', e.message);
     }
   }
+
   return null;
 }
 
 /**
  * Save YouTube Netscape cookies directly from dashboard or API.
+ * Saves to permanent cookies directory so it persists across runs and deploys.
  */
 export function saveYouTubeCookies(content) {
-  if (!fs.existsSync(COOKIES_DIR)) {
-    fs.mkdirSync(COOKIES_DIR, { recursive: true });
+  const cleanContent = (content || '').trim();
+  if (!cleanContent) return;
+
+  // 1. Save to permanent cookies/ folder
+  try {
+    if (!fs.existsSync(COOKIES_DIR)) {
+      fs.mkdirSync(COOKIES_DIR, { recursive: true });
+    }
+    fs.writeFileSync(PRIMARY_COOKIE_FILE, cleanContent, 'utf8');
+  } catch (e) {
+    console.warn('[YouTube] Failed to write to permanent cookies folder:', e.message);
   }
-  fs.writeFileSync(YOUTUBE_COOKIES_PATH, (content || '').trim(), 'utf8');
+
+  // 2. Also save to temp_media folder for backward compatibility
+  try {
+    if (!fs.existsSync(TEMP_COOKIES_DIR)) {
+      fs.mkdirSync(TEMP_COOKIES_DIR, { recursive: true });
+    }
+    fs.writeFileSync(TEMP_YOUTUBE_COOKIES_PATH, cleanContent, 'utf8');
+  } catch {}
 }
 
 /**
  * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
- * Uses a combination of reliable player clients and optional cookie auth.
+ * When cookies are present, yt-dlp uses authentic user credentials to unlock all streams.
  */
 export function getYouTubeYtDlpArgs() {
   const cookiePath = getYouTubeCookieFilePath();
-
-  const args = [
-    // Use tv_embedded + ios — these clients bypass bot checks without needing po_token
-    // ios has its own token system; tv_embedded works on server IPs
-    '--extractor-args',
-    'youtube:player_client=tv_embedded,ios,mweb',
-    // Add a realistic browser user-agent to avoid datacenter IP flagging
-    '--add-header',
-    'User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
-    // Small delay between requests to avoid rate-limiting
-    '--sleep-requests',
-    '1',
-  ];
+  const args = [];
 
   if (cookiePath) {
+    // Authenticated session: let yt-dlp use web/mobile clients with authentic cookies
     args.push('--cookies', cookiePath);
+  } else {
+    // Unauthenticated fallback: attempt bot check bypass with alternative clients
+    args.push('--extractor-args', 'youtube:player_client=tv_embedded,ios,mweb');
   }
+
+  // Standard safe browser headers and rate limit protection
+  args.push(
+    '--add-header',
+    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    '--sleep-requests',
+    '1'
+  );
 
   return args;
 }

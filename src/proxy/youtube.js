@@ -140,6 +140,9 @@ export async function handleYouTubeDownload(req, res) {
       '--merge-output-format', outputExt,
       '--no-playlist',
       '--no-warnings',
+      ...(process.env.YOUTUBE_COOKIES_FILE
+        ? ['--cookies', process.env.YOUTUBE_COOKIES_FILE]
+        : []),
       '-o', `${baseTemplate}.%(ext)s`,
       targetUrl,
     ];

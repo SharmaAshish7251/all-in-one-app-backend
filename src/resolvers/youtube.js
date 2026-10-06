@@ -105,6 +105,9 @@ export async function resolveYouTube(url, options = {}) {
       '--remote-components', 'ejs:github',
       '--js-runtimes', 'node',
       '--no-warnings',
+      ...(process.env.YOUTUBE_COOKIES_FILE
+        ? ['--cookies', process.env.YOUTUBE_COOKIES_FILE]
+        : []),
       targetUrl,
     ];
 

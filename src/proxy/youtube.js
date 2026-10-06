@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { getFfmpegPath } from '../resolvers/youtube.js';
+import { getFfmpegPath, getYouTubeYtDlpArgs } from '../resolvers/youtube.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +140,7 @@ export async function handleYouTubeDownload(req, res) {
       '--merge-output-format', outputExt,
       '--no-playlist',
       '--no-warnings',
+      ...getYouTubeYtDlpArgs(),
       '-o', `${baseTemplate}.%(ext)s`,
       targetUrl,
     ];

@@ -1,4 +1,12 @@
 import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const COOKIES_DIR = path.resolve(__dirname, '../../temp_media');
+const YOUTUBE_COOKIES_PATH = path.join(COOKIES_DIR, 'youtube_cookies.txt');
 
 // Known or detected ffmpeg binary
 let cachedFfmpegPath = null;
@@ -89,6 +97,72 @@ function sanitizeFilename(name) {
     .slice(0, 100);
 }
 
+
+/**
+ * Get the path to YouTube cookies if available.
+ * Checks YOUTUBE_COOKIES_FILE, existing written cookies, or YOUTUBE_COOKIES env var.
+ */
+export function getYouTubeCookieFilePath() {
+  if (process.env.YOUTUBE_COOKIES_FILE && fs.existsSync(process.env.YOUTUBE_COOKIES_FILE)) {
+    return process.env.YOUTUBE_COOKIES_FILE;
+  }
+  if (fs.existsSync(YOUTUBE_COOKIES_PATH)) {
+    try {
+      if (fs.statSync(YOUTUBE_COOKIES_PATH).size > 0) {
+        return YOUTUBE_COOKIES_PATH;
+      }
+    } catch {}
+  }
+  const envCookie = process.env.YOUTUBE_COOKIES;
+  if (envCookie && envCookie.trim()) {
+    try {
+      if (!fs.existsSync(COOKIES_DIR)) {
+        fs.mkdirSync(COOKIES_DIR, { recursive: true });
+      }
+      let content = envCookie.trim();
+      // Decode base64 if user encoded raw Netscape cookie content
+      if (content.startsWith('ey') || (!content.includes('\t') && content.length > 50 && /^[A-Za-z0-9+/=]+$/.test(content))) {
+        try {
+          const decoded = Buffer.from(content, 'base64').toString('utf8');
+          if (decoded.includes('youtube.com') || decoded.includes('# Netscape')) {
+            content = decoded;
+          }
+        } catch {}
+      }
+      fs.writeFileSync(YOUTUBE_COOKIES_PATH, content, 'utf8');
+      return YOUTUBE_COOKIES_PATH;
+    } catch (e) {
+      console.warn('[YouTube] Failed to write cookie file from env:', e.message);
+    }
+  }
+  return null;
+}
+
+/**
+ * Save YouTube Netscape cookies directly from dashboard or API.
+ */
+export function saveYouTubeCookies(content) {
+  if (!fs.existsSync(COOKIES_DIR)) {
+    fs.mkdirSync(COOKIES_DIR, { recursive: true });
+  }
+  fs.writeFileSync(YOUTUBE_COOKIES_PATH, (content || '').trim(), 'utf8');
+}
+
+/**
+ * Get recommended yt-dlp arguments to bypass bot detection on datacenter / cloud IPs.
+ */
+export function getYouTubeYtDlpArgs() {
+  const args = [
+    '--extractor-args',
+    'youtube:player_client=mweb,android,web_safari,web',
+  ];
+  const cookiePath = getYouTubeCookieFilePath();
+  if (cookiePath) {
+    args.push('--cookies', cookiePath);
+  }
+  return args;
+}
+
 /**
  * Resolve YouTube video details and formats via yt-dlp.
  */
@@ -105,6 +179,7 @@ export async function resolveYouTube(url, options = {}) {
       '--remote-components', 'ejs:github',
       '--js-runtimes', 'node',
       '--no-warnings',
+      ...getYouTubeYtDlpArgs(),
       targetUrl,
     ];
 
@@ -122,8 +197,12 @@ export async function resolveYouTube(url, options = {}) {
 
     proc.on('close', (code) => {
       if (code !== 0) {
+        let msg = stderrData || `Exit code ${code}`;
+        if (msg.includes("confirm you're not a bot") || msg.includes('Sign in to confirm')) {
+          msg = "YouTube bot detection triggered on server IP. Configure YouTube cookies in backend environment variables (YOUTUBE_COOKIES) or dashboard to authenticate.";
+        }
         return reject(
-          new Error(`Failed to extract YouTube video: ${stderrData || `Exit code ${code}`}`)
+          new Error(`Failed to extract YouTube video: ${msg}`)
         );
       }
 

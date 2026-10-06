@@ -224,6 +224,56 @@
               </ol>
             </div>
           </div>
+
+          <!-- YouTube Authentication & Cookies Section -->
+          <div class="cookie-input-section" id="youtube-cookie-section" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <div class="input-header-row">
+              <label for="youtube-cookie-input" class="section-label">
+                <i class="fa-brands fa-youtube" style="color: #ff0000; margin-right: 4px;"></i> YouTube Cookies (Bypass Bot Verification)
+              </label>
+              <span class="cookie-status-text" id="yt-cookie-status-indicator">
+                <i class="fa-solid fa-circle-question"></i> Checking...
+              </span>
+            </div>
+
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              YouTube blocks cloud/datacenter IPs with <em>"Sign in to confirm you're not a bot"</em>. Providing cookies from your browser allows yt-dlp to download all resolutions safely.
+            </p>
+
+            <div class="input-wrapper">
+              <textarea
+                id="youtube-cookie-input"
+                class="form-control code-font"
+                rows="3"
+                placeholder="Paste Netscape cookies.txt content here (# Netscape HTTP Cookie File...)"
+                autocomplete="off"
+                spellcheck="false"
+                style="resize: vertical; font-size: 0.8rem; width: 100%; box-sizing: border-box; padding: 0.6rem; border-radius: 8px;"
+              ></textarea>
+            </div>
+
+            <div class="cookie-actions-row" style="margin-top: 0.75rem;">
+              <button type="button" id="btn-save-yt-cookie" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span id="btn-save-yt-cookie-text">Save YouTube Cookies</span>
+              </button>
+            </div>
+
+            <div class="guide-accordion" style="margin-top: 0.75rem;">
+              <button type="button" class="guide-toggle" id="btn-yt-guide-toggle" aria-expanded="false">
+                <span><i class="fa-regular fa-lightbulb"></i> How to export YouTube cookies in 15 seconds</span>
+                <i class="fa-solid fa-chevron-down guide-arrow" id="yt-guide-arrow"></i>
+              </button>
+              <div class="guide-content hidden" id="yt-guide-content">
+                <ol class="step-list">
+                  <li>Install the browser extension <strong>"Get cookies.txt LOCALLY"</strong> (Chrome / Firefox / Edge).</li>
+                  <li>Visit <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">youtube.com</a> while signed in.</li>
+                  <li>Click the extension icon and copy the exported cookies text.</li>
+                  <li>Paste the text into the box above and click <strong>Save YouTube Cookies</strong> (or save in Render as environment variable <code>YOUTUBE_COOKIES</code>).</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </article>
 
         <!-- Live Activity & Telemetry Card -->

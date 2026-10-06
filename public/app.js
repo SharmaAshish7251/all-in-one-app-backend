@@ -46,6 +46,15 @@ const bannerLatency = document.getElementById('banner-latency');
 const btnGuideToggle = document.getElementById('btn-guide-toggle');
 const guideContent = document.getElementById('guide-content');
 
+// YouTube Cookies
+const ytCookieStatusIndicator = document.getElementById('yt-cookie-status-indicator');
+const youtubeCookieInput = document.getElementById('youtube-cookie-input');
+const btnSaveYtCookie = document.getElementById('btn-save-yt-cookie');
+const btnSaveYtCookieText = document.getElementById('btn-save-yt-cookie-text');
+const btnYtGuideToggle = document.getElementById('btn-yt-guide-toggle');
+const ytGuideContent = document.getElementById('yt-guide-content');
+const ytGuideArrow = document.getElementById('yt-guide-arrow');
+
 // Expiry Alert Banner & Auto-Capture Modal
 const expiryWarningBanner = document.getElementById('expiry-warning-banner');
 const btnBannerLoginCapture = document.getElementById('btn-banner-login-capture');
@@ -234,6 +243,17 @@ async function fetchConfig() {
     } else {
       cookieStatusIndicator.className = 'cookie-status-text warning';
       cookieStatusIndicator.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> No cookie configured`;
+    }
+
+    // Update YouTube cookie status
+    if (ytCookieStatusIndicator) {
+      if (data.hasYouTubeCookie) {
+        ytCookieStatusIndicator.className = 'cookie-status-text active';
+        ytCookieStatusIndicator.innerHTML = `<i class="fa-solid fa-circle-check"></i> Configured (Bypass Active)`;
+      } else {
+        ytCookieStatusIndicator.className = 'cookie-status-text warning';
+        ytCookieStatusIndicator.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> No cookie (Bot check risk)`;
+      }
     }
   } catch (err) {
     console.warn('Failed to fetch config:', err);
@@ -426,6 +446,51 @@ btnSaveConfig.addEventListener('click', async () => {
     btnSaveConfigText.textContent = 'Save & Apply Config';
   }
 });
+
+// Save YouTube Cookies
+if (btnSaveYtCookie) {
+  btnSaveYtCookie.addEventListener('click', async () => {
+    const ytCookieVal = (youtubeCookieInput.value || '').trim();
+    if (!ytCookieVal) {
+      showToast('Please paste cookies content first', 'warning');
+      return;
+    }
+
+    btnSaveYtCookie.disabled = true;
+    btnSaveYtCookieText.textContent = 'Saving...';
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtubeCookie: ytCookieVal }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('YouTube cookies saved! Bot checks bypassed.', 'success');
+        youtubeCookieInput.value = '';
+        await fetchConfig();
+      } else {
+        showToast(data.message || 'Failed to save YouTube cookies', 'error');
+      }
+    } catch (err) {
+      showToast('Network error saving YouTube cookies', 'error');
+    } finally {
+      btnSaveYtCookie.disabled = false;
+      btnSaveYtCookieText.textContent = 'Save YouTube Cookies';
+    }
+  });
+}
+
+// Toggle YouTube Guide Accordion
+if (btnYtGuideToggle) {
+  btnYtGuideToggle.addEventListener('click', () => {
+    const isHidden = ytGuideContent.classList.contains('hidden');
+    ytGuideContent.classList.toggle('hidden');
+    btnYtGuideToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    ytGuideArrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+  });
+}
 
 // Clear Logs
 btnClearLogs.addEventListener('click', () => {

@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isTeraBoxUrl, resolveTeraBox, testTeraBoxCookie, formatCookie } from './resolvers/terabox.js';
 import { isTwitterUrl, resolveTwitter } from './resolvers/twitter.js';
-import { isYouTubeUrl, resolveYouTube } from './resolvers/youtube.js';
+import { isYouTubeUrl, resolveYouTube, getYouTubeCookieFilePath, saveYouTubeCookies } from './resolvers/youtube.js';
 import { handleStreamDownload } from './proxy/stream.js';
 import { handleYouTubeDownload } from './proxy/youtube.js';
 
@@ -159,17 +159,20 @@ app.get('/api/config', (req, res) => {
     maskedRapidApiKey = apiKey.length > 12 ? `${apiKey.slice(0, 5)}...${apiKey.slice(-4)}` : '••••••••';
   }
 
+  const hasYouTubeCookie = Boolean(getYouTubeCookieFilePath());
+
   res.json({
     mode: runtimeConfig.teraboxMode,
     hasCookie: Boolean(cookie),
     maskedCookie,
     hasRapidApi: Boolean(apiKey),
     maskedRapidApiKey,
+    hasYouTubeCookie,
   });
 });
 
 app.post('/api/config', (req, res) => {
-  const { cookie, mode, rapidApiKey } = req.body || {};
+  const { cookie, mode, rapidApiKey, youtubeCookie } = req.body || {};
 
   if (mode && ['hybrid', 'auto', 'custom', 'rapidapi'].includes(mode)) {
     runtimeConfig.teraboxMode = mode;
@@ -183,6 +186,10 @@ app.post('/api/config', (req, res) => {
     runtimeConfig.rapidApiKey = rapidApiKey.trim();
   }
 
+  if (typeof youtubeCookie === 'string' && youtubeCookie.trim()) {
+    saveYouTubeCookies(youtubeCookie);
+  }
+
   // Persist to .env
   persistConfigToEnv(runtimeConfig.teraboxCookie, runtimeConfig.teraboxMode, runtimeConfig.rapidApiKey);
 
@@ -192,6 +199,7 @@ app.post('/api/config', (req, res) => {
     mode: runtimeConfig.teraboxMode,
     hasCookie: Boolean(runtimeConfig.teraboxCookie),
     hasRapidApi: Boolean(runtimeConfig.rapidApiKey),
+    hasYouTubeCookie: Boolean(getYouTubeCookieFilePath()),
   });
 });
 

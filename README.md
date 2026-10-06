@@ -48,6 +48,21 @@ BASE_URL=http://localhost:4000
 TERABOX_COOKIE=lang=en; ndus=YOUR_NDUS_COOKIE_HERE
 ```
 
+#### Optional YouTube cookies
+
+Some YouTube requests require authentication. Export your own YouTube cookies
+in Netscape format and configure the backend to read them from a file:
+
+```env
+YOUTUBE_COOKIES_FILE=/path/to/youtube-cookies.txt
+```
+
+On Render, add the cookie file under **Secret Files** (for example,
+`youtube-cookies.txt`) and set `YOUTUBE_COOKIES_FILE` to
+`/etc/secrets/youtube-cookies.txt`. Do not commit or share this file; it grants
+access to your YouTube session. The backend uses it for both resolving videos
+and downloading them.
+
 #### How to get your `ndus` TeraBox Cookie:
 1. Open [https://www.terabox.com](https://www.terabox.com) in Chrome/Edge and log into your account.
 2. Press `F12` to open Developer Tools.
@@ -148,8 +163,12 @@ GET /api/download?dlink=<encoded_dlink>&filename=sample.mp4
 5. In **Environment Variables**, add:
    - `BASE_URL`: `https://your-app-name.onrender.com`
    - `TERABOX_COOKIE`: `lang=en; ndus=YOUR_NDUS_VALUE`
-6. Click **Deploy**.
-7. In your React Native app's `.env`, update:
+6. If YouTube requires authentication, add your Netscape-format cookies file
+   under **Secret Files** as `youtube-cookies.txt`, then add
+   `YOUTUBE_COOKIES_FILE=/etc/secrets/youtube-cookies.txt` under **Environment
+   Variables**.
+7. Click **Deploy**.
+8. In your React Native app's `.env`, update:
    ```env
    EXPO_PUBLIC_WORKER_URL=https://your-app-name.onrender.com
    ```

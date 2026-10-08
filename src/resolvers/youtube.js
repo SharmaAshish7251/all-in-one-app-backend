@@ -112,9 +112,25 @@ export function getYouTubeCookieFilePath() {
   const sameDir = __dirname;
   const srcDir = path.resolve(__dirname, '../');
   const cwdDir = process.cwd();
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const browserCookieNames = [
+    'www.youtube.com_cookies.txt',
+    'youtube.com_cookies.txt',
+    'youtube_cookies.txt',
+    'youtube.txt',
+    'cookies.txt',
+  ];
+  const browserCookiePaths = homeDir
+    ? browserCookieNames.flatMap((name) => [
+        path.join(homeDir, 'Downloads', name),
+        path.join(homeDir, 'downloads', name),
+        path.join(homeDir, name),
+      ])
+    : [];
 
   const candidates = [
     process.env.YOUTUBE_COOKIES_FILE,
+    ...browserCookiePaths,
     // Same folder as this file (src/resolvers/)
     path.join(sameDir, 'youtube.txt'),
     path.join(sameDir, 'cookies.txt'),

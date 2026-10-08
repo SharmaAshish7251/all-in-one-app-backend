@@ -154,7 +154,7 @@ export function saveYouTubeCookies(content) {
 export function getYouTubeYtDlpArgs() {
   const args = [
     '--extractor-args',
-    'youtube:player_client=mweb,android,web_safari,web',
+    'youtube:player_client=android,ios,mweb,web',
   ];
   const cookiePath = getYouTubeCookieFilePath();
   if (cookiePath) {

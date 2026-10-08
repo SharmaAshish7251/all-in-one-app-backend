@@ -131,13 +131,16 @@ export async function handleYouTubeDownload(req, res) {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
 
   const downloadPromise = new Promise((resolve, reject) => {
+    const isAudio = outputExt === 'm4a' || outputExt === 'mp3';
     const args = [
       '-m', 'yt_dlp',
       '--ffmpeg-location', ffmpegPath,
       '--remote-components', 'ejs:github',
       '--js-runtimes', 'node',
       '-f', formatSelector,
-      '--merge-output-format', outputExt,
+      ...(isAudio
+        ? ['-x', '--audio-format', outputExt]
+        : ['--merge-output-format', 'mp4']),
       '--no-playlist',
       '--no-warnings',
       ...getYouTubeYtDlpArgs(),

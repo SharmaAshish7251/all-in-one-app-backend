@@ -29,6 +29,20 @@ export function getInstagramYtDlpArgs(
   ];
 }
 
+export function formatInstagramResolveError(details, code) {
+  if (
+    /\b429\b|too many requests|rate[- ]limit.{0,80}anonymously|redirected to the login page/i.test(
+      details,
+    )
+  ) {
+    return "Instagram is rate-limiting anonymous requests or requires authentication. Wait before retrying, or configure INSTAGRAM_COOKIES_FILE with a valid cookies.txt file.";
+  }
+
+  return details
+    ? `Could not resolve this Instagram post: ${details}`
+    : `Instagram resolver exited with code ${code}.`;
+}
+
 function isInstagramHost(hostname) {
   const host = hostname.toLowerCase();
   return ["instagram.com", "instagr.am"].some(
@@ -398,20 +412,7 @@ export async function resolveInstagram(url, options = {}) {
 
       if (code !== 0) {
         const details = stderr.trim().slice(0, 300);
-        if (/\b429\b|too many requests/i.test(details)) {
-          return reject(
-            new Error(
-              "Instagram is temporarily rate-limiting requests (HTTP 429). Wait before retrying, or configure INSTAGRAM_COOKIES_FILE with a valid cookies.txt file.",
-            ),
-          );
-        }
-        return reject(
-          new Error(
-            details
-              ? `Could not resolve this Instagram post: ${details}`
-              : `Instagram resolver exited with code ${code}.`,
-          ),
-        );
+        return reject(new Error(formatInstagramResolveError(details, code)));
       }
 
       try {

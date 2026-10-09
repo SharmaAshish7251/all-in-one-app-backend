@@ -4,6 +4,7 @@ import test from "node:test";
 import {
     addMissingMediaSizes,
     buildInstagramResponse,
+    formatInstagramResolveError,
     getInstagramCookieArgs,
     getInstagramYtDlpArgs,
     isInstagramUrl,
@@ -16,6 +17,20 @@ test("adds an optional cookies file to Instagram yt-dlp commands", () => {
 
   assert.deepEqual(args.slice(-3), ["--cookies", cookiesFile, url]);
   assert.deepEqual(getInstagramCookieArgs("  "), []);
+});
+
+test("explains Instagram anonymous rate-limit and login-redirect errors", () => {
+  const details =
+    "The webpage request was redirected to the login page. You have exceeded the rate-limit for accessing posts anonymously.";
+
+  assert.match(
+    formatInstagramResolveError(details, 1),
+    /rate-limiting anonymous requests or requires authentication.*INSTAGRAM_COOKIES_FILE/,
+  );
+  assert.equal(
+    formatInstagramResolveError("Unsupported URL", 1),
+    "Could not resolve this Instagram post: Unsupported URL",
+  );
 });
 
 test("accepts Instagram post and reel links across supported hosts", () => {

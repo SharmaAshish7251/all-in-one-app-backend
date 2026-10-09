@@ -92,6 +92,31 @@ function persistConfigToEnv(cookie, mode, rapidApiKey) {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Security Guard: Block any external attempt to access sensitive credentials or directories
+app.use((req, res, next) => {
+  const reqPath = decodeURIComponent(req.path || '').toLowerCase();
+  const forbiddenPatterns = [
+    '/cookies',
+    'cookies.txt',
+    'youtube.txt',
+    '.env',
+    '.git',
+    'temp_media',
+    'package.json',
+    'src/',
+    'scripts/',
+    '..',
+  ];
+
+  if (forbiddenPatterns.some((pattern) => reqPath.includes(pattern))) {
+    return res.status(403).json({
+      error: { code: 'FORBIDDEN', message: 'Access denied: sensitive resource.' },
+    });
+  }
+  next();
+});
+
 app.use(express.static(publicPath));
 
 // Request logging middleware
@@ -432,11 +457,13 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  const ytCookiePath = getYouTubeCookieFilePath();
   console.log('----------------------------------------------------');
   console.log(`🚀 All-in-One Downloader Backend running on port ${PORT}`);
   console.log(`🔗 Local URL: ${BASE_URL}`);
   console.log(`📊 Admin Dashboard: ${BASE_URL}/dashboard`);
   console.log(`⚙️  TeraBox Mode: ${runtimeConfig.teraboxMode.toUpperCase()}`);
   console.log(`🍪 TeraBox Cookie configured: ${runtimeConfig.teraboxCookie ? 'YES' : 'NO'}`);
+  console.log(`🍪 YouTube Cookies detected: ${ytCookiePath ? `YES (${ytCookiePath})` : 'NO (Unauthenticated)'}`);
   console.log('----------------------------------------------------');
 });

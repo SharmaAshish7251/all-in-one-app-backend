@@ -1,11 +1,12 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
 # dependencies
 node_modules/
- 
 
- .env
- .env.local
+.env
+.env.local
 cache/
 temp_media/
+
 *cookies*.txt
+.kilo/
+cookies/
+src/resolvers/youtube.txt

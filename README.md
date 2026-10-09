@@ -29,7 +29,6 @@ A lightweight Node.js backend resolver and streaming proxy for **TeraBox**, **Tw
 ## Auto-Capturing the TeraBox `ndus` Key
 
 Instead of manually inspecting cookies in DevTools:
-
 1. Open the Dashboard at `http://localhost:4000/dashboard`.
 2. Click **⚡ Auto-Capture** or the **Login & Auto-Capture Key** alert banner.
 3. Drag the **⚡ Sync TeraBox to AIO** bookmarklet to your browser toolbar.
@@ -41,16 +40,13 @@ Instead of manually inspecting cookies in DevTools:
 ## Quick Start (Local Setup)
 
 ### 1. Install Dependencies
-
 ```bash
 cd backend
 npm install
 ```
 
 ### 2. Configure Environment (`.env`)
-
 Copy `.env.example` to `.env`:
-
 ```bash
 PORT=4000
 BASE_URL=http://localhost:4000
@@ -72,15 +68,7 @@ On Render, add the cookie file under **Secret Files** (for example,
 access to your YouTube session. The backend uses it for both resolving videos
 and downloading them.
 
-#### Optional Instagram cookies
-
-Instagram may rate-limit anonymous requests. Export your own Instagram cookies
-in Netscape format and set `INSTAGRAM_COOKIES_FILE` to the file path. On Render,
-store the file as a Secret File and point this variable to its mounted path.
-Never commit or share the file; it grants access to your Instagram session.
-
 #### How to get your `ndus` TeraBox Cookie:
-
 1. Open [https://www.terabox.com](https://www.terabox.com) in Chrome/Edge and log into your account.
 2. Press `F12` to open Developer Tools.
 3. Go to the **Application** (or **Storage**) tab > **Cookies** > `https://www.terabox.com`.
@@ -91,7 +79,6 @@ Never commit or share the file; it grants access to your Instagram session.
    ```
 
 ### 3. Start the Server
-
 ```bash
 # Start in production mode
 npm start
@@ -105,13 +92,10 @@ npm run dev
 ## API Endpoints
 
 ### 1. Health Check
-
 ```http
 GET /health
 ```
-
 **Response:**
-
 ```json
 {
   "ok": true,
@@ -125,7 +109,6 @@ GET /health
 ---
 
 ### 2. Resolve URL (`POST /resolve`)
-
 Matches the mobile app's resolver contract.
 
 ```http
@@ -138,7 +121,6 @@ Content-Type: application/json
 ```
 
 **Response:**
-
 ```json
 {
   "platform": "terabox",
@@ -169,7 +151,6 @@ Pinterest Pin URLs use the same `POST /resolve` endpoint. When Pinterest exposes
 ---
 
 ### 3. Direct Streaming Download (`GET /api/download`)
-
 Streams the file directly to the client with `Content-Disposition: attachment`.
 
 ```http
@@ -181,13 +162,12 @@ GET /api/download?dlink=<encoded_dlink>&filename=sample.mp4
 ## Free Cloud Deployment
 
 ### Deploy to Render.com (Recommended)
-
 1. Push your `backend` folder to GitHub (as its own repo or monorepo subfolder).
 2. Go to [Render.com](https://render.com) > **New Web Service**.
 3. Select your repository.
 4. Set:
    - **Root Directory:** `backend`
-   - **Build Command:** `npm install`
+   - **Build Command:** `npm install && python3 -m pip install --upgrade "yt-dlp[default]"`
    - **Start Command:** `npm start`
 5. In **Environment Variables**, add:
    - `BASE_URL`: `https://your-app-name.onrender.com`
